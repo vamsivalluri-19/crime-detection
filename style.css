@@ -1,0 +1,459 @@
+/* Improved login/register styling */
+ .login-card, .register-card {
+   background: rgba(35, 38, 47, 0.98);
+   padding: 56px 44px 44px 44px;
+   border-radius: 32px;
+   box-shadow: 0 20px 60px #000b, 0 2px 16px #23294666;
+   min-width: 420px;
+   max-width: 98vw;
+   border: 2.5px solid #1e40af55;
+   display: flex;
+   flex-direction: column;
+   gap: 18px;
+ }
+}
+
+.logo-icon {
+  background: linear-gradient(135deg, #dc2626 60%, #ea580c 100%);
+  color: #fff;
+  font-size: 3rem;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px #dc262644;
+}
+
+.form-input {
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  border: 2px solid #232946;
+  background: rgba(35, 38, 47, 0.98);
+  color: #fff;
+  font-size: 1.15rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 4px #23294633;
+}
+.form-input:focus {
+  border-color: #1e40af;
+  box-shadow: 0 0 0 2px #1e40af33;
+  outline: none;
+}
+
+.btn-block {
+  width: 100%;
+  font-size: 1.25rem;
+  margin-top: 20px;
+  padding: 18px 0;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #1e40af 60%, #16a34a 100%);
+  color: #fff;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px #1e40af33;
+}
+.btn-block:hover {
+  background: linear-gradient(90deg, #16a34a 60%, #1e40af 100%);
+  box-shadow: 0 2px 8px #16a34a44;
+}
+
+.btn-small {
+  padding: 8px 22px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  border: none;
+  background: #232946;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-small.btn-primary {
+  background: #1e40af;
+}
+.btn-small.btn-success {
+  background: #16a34a;
+}
+.btn-small:hover {
+  background: #ea580c;
+}
+
+.form-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 1.05rem;
+  color: #94a3b8;
+}
+
+.error-msg, .success-msg {
+  font-size: 1.05rem;
+  border-radius: 8px;
+  padding: 8px 0;
+}
+/* Enhanced Overlay styles */
+.login-overlay, .register-overlay {
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #181a20 60%, #232946 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+}
+.register-overlay { z-index: 2100; display: none; }
+
+/* Glassmorphic Card styles */
+.login-card, .register-card {
+  background: rgba(35, 38, 47, 0.85);
+  padding: 44px 36px 36px 36px;
+  border-radius: 24px;
+  box-shadow: 0 12px 40px #0009, 0 1.5px 8px #23294644;
+  min-width: 360px;
+  max-width: 95vw;
+  border: 1.5px solid #23294688;
+  transition: box-shadow 0.2s;
+}
+.login-card:hover, .register-card:hover {
+  box-shadow: 0 16px 48px #000b, 0 2px 12px #23294666;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+
+.logo-icon {
+  background: linear-gradient(135deg, #dc2626 60%, #ea580c 100%);
+  color: #fff;
+  font-size: 2.2rem;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px #dc262644;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  border: 1.5px solid #232946;
+  background: rgba(35, 38, 47, 0.95);
+  color: #fff;
+  font-size: 1.05rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-input:focus {
+  border-color: #1e40af;
+  box-shadow: 0 0 0 2px #1e40af33;
+  outline: none;
+}
+
+.btn-block {
+  width: 100%;
+  font-size: 1.15rem;
+  margin-top: 12px;
+  padding: 12px 0;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #1e40af 60%, #16a34a 100%);
+  color: #fff;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.btn-block:hover {
+  background: linear-gradient(90deg, #16a34a 60%, #1e40af 100%);
+  box-shadow: 0 2px 8px #16a34a44;
+}
+
+.btn-small {
+  padding: 8px 22px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 500;
+  border: none;
+  background: #232946;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-small.btn-primary {
+  background: #1e40af;
+}
+.btn-small.btn-success {
+  background: #16a34a;
+}
+.btn-small:hover {
+  background: #ea580c;
+}
+
+.form-footer {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.error-msg {
+  color: var(--danger-color);
+  margin-top: 18px;
+  display: none;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.5px;
+  font-size: 1.1rem;
+  background: rgba(220,38,38,0.08);
+  border-radius: 10px;
+  padding: 10px 0;
+}
+
+.success-msg {
+  color: var(--success-color);
+  margin-top: 18px;
+  display: none;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.5px;
+  font-size: 1.1rem;
+  background: rgba(22,163,74,0.08);
+  border-radius: 10px;
+  padding: 10px 0;
+}
+/* Overlay styles */
+.login-overlay, .register-overlay {
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.register-overlay { z-index: 2100; display: none; }
+
+/* Card styles */
+.login-card, .register-card {
+  background: var(--bg-card);
+  padding: 40px 32px 32px 32px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px #0008;
+  min-width: 340px;
+  max-width: 95vw;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.logo-icon {
+  background: #dc2626;
+  color: #fff;
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 1px solid #232946;
+  background: #232946;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.btn-block {
+  width: 100%;
+  font-size: 1.1rem;
+  margin-top: 10px;
+}
+
+.form-footer {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.error-msg {
+  color: var(--danger-color);
+  margin-top: 10px;
+  display: none;
+  font-weight: bold;
+  text-align: center;
+}
+
+.success-msg {
+  color: var(--success-color);
+  margin-top: 10px;
+  display: none;
+  font-weight: bold;
+  text-align: center;
+}
+/*
+  Custom styles for AI Crime Detection System
+  Move all inline styles from index.html here and reference this file in your HTML.
+*/
+
+:root {
+  --bg-dark: #181a20;
+  --bg-card: #23262f;
+  --danger-color: #dc2626;
+  --warning-color: #ea580c;
+  --primary-color: #1e40af;
+  --success-color: #16a34a;
+  --text-muted: #a1a1aa;
+}
+
+#mainLoginOverlay, #registerOverlay {
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#registerOverlay { z-index: 2100; display: none; }
+
+.login-card, .register-card {
+  background: var(--bg-card);
+  padding: 40px 32px 32px 32px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px #0008;
+  min-width: 320px;
+  max-width: 90vw;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1, h2 {
+  font-size: 2rem;
+  margin-bottom: 18px;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.form-input {
+  margin-bottom: 14px;
+}
+
+select.form-input {
+  margin-bottom: 18px;
+}
+
+.btn-primary, .btn-success {
+  width: 100%;
+  font-size: 1.1rem;
+}
+
+#loginErrorMsg, #registerErrorMsg {
+  color: var(--danger-color);
+  margin-top: 10px;
+  display: none;
+}
+#registerSuccessMsg {
+  color: var(--success-color);
+  margin-top: 10px;
+  display: none;
+}
+
+#mainHeader {
+  display: none;
+}
+
+.user-info#userDetailsBar {
+  display: none;
+}
+
+.container#mainContainer {
+  display: none;
+}
+
+.stat-icon.danger {
+  background: rgba(220, 38, 38, 0.2);
+  color: var(--danger-color);
+}
+.stat-icon.warning {
+  background: rgba(234, 88, 12, 0.2);
+  color: var(--warning-color);
+}
+.stat-icon.primary {
+  background: rgba(30, 64, 175, 0.2);
+  color: var(--primary-color);
+}
+.stat-icon.success {
+  background: rgba(22, 163, 74, 0.2);
+  color: var(--success-color);
+}
+
+.sos-title {
+  color: white;
+  margin-bottom: 20px;
+  font-size: 28px;
+}
+.sos-desc {
+  margin-top: 20px;
+  font-size: 16px;
+}
+.sos-note {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.grid-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  padding: 20px;
+  background: rgba(30, 64, 175, 0.1);
+  border-radius: 8px;
+}
+.feature-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+.feature-title {
+  margin-bottom: 8px;
+}
+.feature-desc {
+  color: var(--text-muted);
+  font-size: 14px;
+}

@@ -1,0 +1,2696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Crime Detection & Emergency Response System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-color: #1e40af;
+            --danger-color: #dc2626;
+            --success-color: #16a34a;
+            --warning-color: #ea580c;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-light: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--danger-color);
+            margin-bottom: 30px;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--danger-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            color: var(--text-light);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #1e40af 0%, #3b82f6 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(30,64,175,0.15);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(90deg, #3b82f6 0%, #1e40af 100%);
+            box-shadow: 0 4px 16px rgba(30,64,175,0.25);
+        }
+
+        .btn-danger {
+            background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(220,38,38,0.15);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(90deg, #b91c1c 0%, #dc2626 100%);
+            box-shadow: 0 4px 16px rgba(220,38,38,0.25);
+        }
+
+        .btn-success {
+            background: linear-gradient(90deg, #16a34a 0%, #22c55e 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(34,197,94,0.15);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+            box-shadow: 0 4px 16px rgba(34,197,94,0.25);
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-block {
+            width: 100%;
+            display: block;
+        }
+
+        .form-input {
+            background: #232946;
+            border: 1px solid #3b82f6;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 16px;
+            padding: 12px;
+            margin-bottom: 10px;
+            width: 100%;
+            transition: border 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #1e40af;
+            outline: none;
+        }
+
+        .register-overlay, .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #232946 60%, #1e293b 100%);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .register-card, .login-card {
+            background: #232946;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 8px 32px #0008;
+        }
+
+        .flex-center {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .form-footer {
+            margin-top: 20px;
+            text-align: center;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-msg, .success-msg {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error-msg {
+            background: rgba(220, 38, 38, 0.2);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        .success-msg {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            color: var(--text-light);
+        }
+
+        .tab.active {
+            color: var(--danger-color);
+            border-bottom-color: var(--danger-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-title {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-light);
+        }
+
+        .stat-change {
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .stat-change.positive {
+            color: var(--success-color);
+        }
+
+        .stat-change.negative {
+            color: var(--danger-color);
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .alerts-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .alert-item {
+            background: rgba(220, 38, 38, 0.1);
+            border-left: 4px solid var(--danger-color);
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-type {
+            font-weight: 600;
+            color: var(--danger-color);
+            margin-bottom: 4px;
+        }
+
+        .alert-details {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .alert-time {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .sos-panel {
+            background: linear-gradient(135deg, var(--danger-color), #991b1b);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .sos-button {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: white;
+            border: 8px solid rgba(255, 255, 255, 0.3);
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--danger-color);
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .sos-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .sos-button:active {
+            transform: scale(0.95);
+        }
+
+        .detection-feed {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .detection-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .detection-image {
+            width: 100%;
+            height: 200px;
+            background: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .detection-info {
+            padding: 16px;
+        }
+
+        .detection-type {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .detection-type.weapon {
+            color: var(--danger-color);
+        }
+
+        .detection-type.violence {
+            color: var(--warning-color);
+        }
+
+        .detection-type.suspicious {
+            color: #eab308;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        textarea.form-input {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .prediction-chart {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .chart-placeholder {
+            height: 300px;
+            background: rgba(30, 64, 175, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 20px;
+        }
+
+        .incident-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow-x: auto;
+        }
+
+        .incident-table th,
+        .incident-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .incident-table th {
+            background: rgba(30, 64, 175, 0.1);
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        .incident-table tr:hover {
+            background: rgba(30, 64, 175, 0.05);
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-danger {
+            background: rgba(220, 38, 38, 0.2);
+            color: var(--danger-color);
+        }
+
+        .badge-warning {
+            background: rgba(234, 88, 12, 0.2);
+            color: var(--warning-color);
+        }
+
+        .badge-success {
+            background: rgba(22, 163, 74, 0.2);
+            color: var(--success-color);
+        }
+
+        .patrol-units {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .patrol-card {
+            background: var(--bg-card);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .patrol-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .patrol-id {
+            font-weight: 600;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+        }
+
+        /* Voice Command Indicator */
+        .voice-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: 0 4px 16px rgba(30, 64, 175, 0.3);
+            transition: all 0.3s;
+        }
+
+        .voice-indicator:hover {
+            transform: scale(1.1);
+        }
+
+        .voice-indicator.active {
+            animation: voicePulse 1s infinite;
+        }
+
+        @keyframes voicePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(30, 64, 175, 0.7); }
+            50% { box-shadow: 0 0 0 20px rgba(30, 64, 175, 0); }
+        }
+
+        /* Notification Popup */
+        .notification-popup {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            max-width: 350px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            z-index: 9998;
+            animation: slideInRight 0.3s ease-out;
+            display: none;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+                padding: 10px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .tabs {
+                overflow-x: auto;
+                font-size: 13px;
+                gap: 4px;
+            }
+
+            .tab {
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+
+            .alerts-section, .prediction-chart {
+                padding: 12px;
+            }
+
+            .sos-button {
+                width: 120px;
+                height: 120px;
+                font-size: 16px;
+            }
+
+            .modal-content {
+                padding: 16px;
+                max-width: 98vw;
+            }
+
+            .incident-table th, .incident-table td {
+                padding: 6px;
+                font-size: 12px;
+            }
+
+            .patrol-units {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .detection-feed {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            #map {
+                height: 220px;
+            }
+
+            .form-input {
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            .stat-value {
+                font-size: 20px;
+            }
+
+            .stat-title {
+                font-size: 12px;
+            }
+
+            .section-title {
+                font-size: 16px;
+            }
+
+            .logo-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+
+            .voice-indicator {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .notification-popup {
+                right: 10px;
+                top: 70px;
+                max-width: calc(100vw - 20px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Registration Overlay -->
+    <div id="registerOverlay" class="register-overlay">
+        <div class="register-card">
+            <div class="flex-center">
+                <div class="logo-icon">🚨</div>
+                <div>
+                    <h1>Register</h1>
+                    <div class="text-muted">Create your account</div>
+                </div>
+            </div>
+            <form id="registerForm">
+                <input name="reg_username" placeholder="Email or Badge Number" class="form-input" autocomplete="username" required>
+                <input type="password" name="reg_password" placeholder="Password" class="form-input" autocomplete="new-password" required>
+                <input type="password" name="reg_confirm" placeholder="Confirm Password" class="form-input" autocomplete="new-password" required>
+                <select name="reg_role" class="form-input" required>
+                    <option value="citizen">Citizen</option>
+                    <option value="officer">Police Officer</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button type="submit" class="btn btn-success btn-block">Register</button>
+            </form>
+            <div class="form-footer">
+                <span class="text-muted">Already have an account?</span>
+                <button id="showLoginBtn" class="btn btn-small btn-primary">Log In</button>
+            </div>
+            <div id="registerErrorMsg" class="error-msg"></div>
+            <div id="registerSuccessMsg" class="success-msg"></div>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="mainLoginOverlay" class="login-overlay">
+        <div class="login-card">
+            <div class="flex-center">
+                <div class="logo-icon">🚨</div>
+                <div>
+                    <h1>AI Crime Detection System</h1>
+                    <div class="text-muted">Emergency Response & Monitoring Platform</div>
+                </div>
+            </div>
+            <h2 style="margin-bottom: 20px;">Log In</h2>
+            <form id="mainLoginForm">
+                <input name="username" placeholder="Email or Badge Number" class="form-input" required>
+                <input type="password" name="password" placeholder="Password" class="form-input" required>
+                <select name="role" class="form-input" required>
+                    <option value="citizen">Citizen</option>
+                    <option value="officer">Police Officer</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-block">Log In</button>
+            </form>
+            <div class="form-footer">
+                <span class="text-muted">Don't have an account?</span>
+                <button id="showRegisterBtn2" class="btn btn-small btn-success">Register</button>
+            </div>
+            <div id="loginErrorMsg" class="error-msg"></div>
+        </div>
+    </div>
+
+    <header id="mainHeader" style="display:none;">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🚨</div>
+                <div>
+                    <h1>AI Crime Detection System</h1>
+                    <p style="color: var(--text-muted); font-size: 14px;">Emergency Response & Monitoring Platform</p>
+                </div>
+            </div>
+            <div class="user-info" id="userDetailsBar" style="display:none;"></div>
+        </div>
+    </header>
+
+    <div class="container" id="mainContainer" style="display:none;">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab" onclick="switchTab('sos')">SOS Emergency</button>
+            <button class="tab" onclick="switchTab('ai-detection')">AI Detection</button>
+            <button class="tab" onclick="switchTab('analytics')">Crime Analytics</button>
+            <button class="tab" onclick="switchTab('reports')">Reports</button>
+            <button class="tab" onclick="switchTab('evidence')">Evidence Vault</button>
+            <button class="tab" onclick="switchTab('profile')">Profile</button>
+            <button class="tab" id="auditLogTab" style="display:none;" onclick="switchTab('audit-log')">Audit Log</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: rgba(220, 38, 38, 0.2); color: var(--danger-color);">⚠️</div>
+                    </div>
+                    <div class="stat-title">Active Alerts</div>
+                    <div class="stat-value" id="activeAlerts">23</div>
+                    <div class="stat-change positive" id="activeAlertsChange">+3 from last hour</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: rgba(234, 88, 12, 0.2); color: var(--warning-color);">🚔</div>
+                    </div>
+                    <div class="stat-title">Total Incidents</div>
+                    <div class="stat-value" id="totalIncidents">156</div>
+                    <div class="stat-change positive" id="resolvedIncidents">89 Resolved</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: rgba(30, 64, 175, 0.2); color: var(--primary-color);">📊</div>
+                    </div>
+                    <div class="stat-title">Response Time</div>
+                    <div class="stat-value" id="responseTime">3.2m</div>
+                    <div class="stat-change positive">-15% faster</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-icon" style="background: rgba(22, 163, 74, 0.2); color: var(--success-color);">🤖</div>
+                    </div>
+                    <div class="stat-title">AI Accuracy</div>
+                    <div class="stat-value">94.8%</div>
+                    <div class="stat-change positive">+2.3% this week</div>
+                </div>
+            </div>
+
+            <div id="map"></div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🔴 Live Alerts & Incidents</h2>
+                    <button class="btn btn-primary btn-small" onclick="refreshAlerts()">🔄 Refresh</button>
+                </div>
+                <div id="alertsList">
+                    <div class="alert-item">
+                        <div class="alert-content">
+                            <div class="alert-type">🔴 SOS Emergency Alert</div>
+                            <div class="alert-details">Location: 19.0760° N, 72.8777° E (Andheri West, Mumbai)</div>
+                            <div class="alert-time">2 minutes ago</div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-success btn-small" onclick="respondToAlert('SOS-001')">Respond</button>
+                            <button class="btn btn-primary btn-small" onclick="viewLocation(19.0760, 72.8777)">View</button>
+                        </div>
+                    </div>
+
+                    <div class="alert-item">
+                        <div class="alert-content">
+                            <div class="alert-type">⚠️ Weapon Detected</div>
+                            <div class="alert-details">CCTV Camera #24 - Bandra Station | Confidence: 94.2%</div>
+                            <div class="alert-time">5 minutes ago</div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-danger btn-small" onclick="respondToAlert('WD-024')">Dispatch</button>
+                            <button class="btn btn-primary btn-small" onclick="viewDetection('WD-024')">View Feed</button>
+                        </div>
+                    </div>
+
+                    <div class="alert-item">
+                        <div class="alert-content">
+                            <div class="alert-type">🟡 Suspicious Activity</div>
+                            <div class="alert-details">CCTV Camera #15 - Marine Drive | Crowd Behavior Analysis</div>
+                            <div class="alert-time">8 minutes ago</div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-success btn-small" onclick="respondToAlert('SA-015')">Investigate</button>
+                            <button class="btn btn-primary btn-small" onclick="viewDetection('SA-015')">Monitor</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-section" id="citizenSpeechSection" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">🎙️ Live Citizen Speech Feed</h2>
+                    <button class="btn btn-primary btn-small" onclick="clearCitizenSpeechFeed()">Clear</button>
+                </div>
+                <div id="citizenSpeechFeed">
+                    <div class="alert-item">
+                        <div class="alert-content">
+                            <div class="alert-type">Waiting for citizen speech</div>
+                            <div class="alert-details">Citizen microphone messages will appear here and be spoken aloud for officers and admins.</div>
+                            <div class="alert-time">Live feed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🚔 Deployed Patrol Units</h2>
+                    <button class="btn btn-primary btn-small" onclick="deployNewUnit()">+ Deploy Unit</button>
+                </div>
+                <div class="patrol-units" id="patrolUnits">
+                    <div class="patrol-card">
+                        <div class="patrol-header">
+                            <div class="patrol-id">Unit P-101</div>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 14px;">
+                            <div>📍 Andheri West</div>
+                            <div>👮 Officers: 3</div>
+                            <div>⏱️ Response: 3.5 min</div>
+                        </div>
+                    </div>
+
+                    <div class="patrol-card">
+                        <div class="patrol-header">
+                            <div class="patrol-id">Unit P-102</div>
+                            <span class="badge badge-warning">En Route</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 14px;">
+                            <div>📍 Bandra Station</div>
+                            <div>👮 Officers: 2</div>
+                            <div>🚁 ETA: 2 minutes</div>
+                        </div>
+                    </div>
+
+                    <div class="patrol-card">
+                        <div class="patrol-header">
+                            <div class="patrol-id">Unit P-103</div>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 14px;">
+                            <div>📍 Marine Drive</div>
+                            <div>👮 Officers: 4</div>
+                            <div>⏱️ Response: 4.1 min</div>
+                        </div>
+                    </div>
+
+                    <div class="patrol-card">
+                        <div class="patrol-header">
+                            <div class="patrol-id">Unit P-104</div>
+                            <span class="badge badge-success">Active</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 14px;">
+                            <div>📍 Colaba</div>
+                            <div>👮 Officers: 3</div>
+                            <div>⏱️ Response: 5.2 min</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOS Emergency Tab -->
+        <div id="sos" class="tab-content">
+            <div class="sos-panel">
+                <h2 style="color: white; margin-bottom: 20px; font-size: 28px;">🚨 Emergency SOS System</h2>
+                <button
+                    class="sos-button"
+                    id="sosMainBtn"
+                    onmousedown="startSOS()"
+                    onmouseup="stopSOS()"
+                    ontouchstart="startSOS(event)"
+                    ontouchend="stopSOS()"
+                    onmouseleave="stopSOS()"
+                >
+                    SOS<br>EMERGENCY
+                </button>
+                <div style="margin-top: 20px; color: white;">
+                    <p style="font-size: 16px;" id="sosHintText">🔴 Hold the SOS button to sound the alarm</p>
+                    <p style="font-size: 14px; opacity: 0.9;">Your location will be shared with nearby police units</p>
+                    <p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">💡 Tip: Press 'P' key twice quickly for emergency SOS</p>
+                </div>
+            </div>
+
+            <div class="alerts-section" id="citizenMicSection" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">🎙️ Citizen Push-to-Talk Mic</h2>
+                    <button class="btn btn-primary btn-small" onclick="toggleVoiceCommand()">Toggle Mic Mode</button>
+                </div>
+                <div class="alert-item" style="background: rgba(30, 64, 175, 0.08);">
+                    <div class="alert-content">
+                        <div class="alert-type">Hold the button and speak</div>
+                        <div class="alert-details">Your voice goes to police/admin automatically. Keywords like emergency, help, SOS, danger, and police will escalate to SOS.</div>
+                        <div class="alert-time" id="citizenMicStatus">Mic is idle</div>
+                    </div>
+                    <div class="alert-actions">
+                        <button
+                            id="citizenPushToTalkBtn"
+                            class="btn btn-danger btn-small"
+                            onmousedown="startCitizenPushToTalk()"
+                            onmouseup="stopCitizenPushToTalk()"
+                            ontouchstart="startCitizenPushToTalk()"
+                            ontouchend="stopCitizenPushToTalk()"
+                            onmouseleave="stopCitizenPushToTalk()"
+                        >
+                            Hold to Speak
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🛡️ How SOS Works</h2>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="padding: 20px; background: rgba(30, 64, 175, 0.1); border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">📍</div>
+                        <h3 style="margin-bottom: 8px;">Location Sharing</h3>
+                        <p style="color: var(--text-muted); font-size: 14px;">GPS coordinates sent instantly to police command center with live tracking</p>
+                    </div>
+
+                    <div style="padding: 20px; background: rgba(30, 64, 175, 0.1); border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">🚨</div>
+                        <h3 style="margin-bottom: 8px;">Alert Dispatch</h3>
+                        <p style="color: var(--text-muted); font-size: 14px;">Nearby patrol units notified immediately with AI-optimized routing</p>
+                    </div>
+
+                    <div style="padding: 20px; background: rgba(30, 64, 175, 0.1); border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">📞</div>
+                        <h3 style="margin-bottom: 8px;">Contact Alerts</h3>
+                        <p style="color: var(--text-muted); font-size: 14px;">Emergency contacts receive SMS/email notifications with live location link</p>
+                    </div>
+
+                    <div style="padding: 20px; background: rgba(30, 64, 175, 0.1); border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">🎯</div>
+                        <h3 style="margin-bottom: 8px;">Live Tracking</h3>
+                        <p style="color: var(--text-muted); font-size: 14px;">Real-time location updates every 3 seconds until help arrives</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">📱 Emergency Contacts</h2>
+                    <button class="btn btn-primary btn-small" onclick="addContact()">+ Add Contact</button>
+                </div>
+                <table class="incident-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Relationship</th>
+                            <th>Phone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contactsTableBody">
+                        <tr>
+                            <td>John Doe</td>
+                            <td>Family</td>
+                            <td>+91 98765 43210</td>
+                            <td><button class="btn btn-danger btn-small" onclick="removeContact('+91 98765 43210')">Remove</button></td>
+                        </tr>
+                        <tr>
+                            <td>Jane Smith</td>
+                            <td>Friend</td>
+                            <td>+91 98765 43211</td>
+                            <td><button class="btn btn-danger btn-small" onclick="removeContact('+91 98765 43211')">Remove</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- AI Detection Tab -->
+        <div id="ai-detection" class="tab-content">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🤖 Live AI Detection Feed</h2>
+                    <div>
+                        <button class="btn btn-success btn-small" onclick="startDetection()">▶️ Start</button>
+                        <button class="btn btn-danger btn-small" onclick="stopDetection()">⏸️ Stop</button>
+                        <button class="btn btn-primary btn-small" onclick="exportDetectionLog()">📥 Export Log</button>
+                    </div>
+                </div>
+                
+                <div class="detection-feed" id="detectionFeed">
+                    <div class="detection-card">
+                        <div class="detection-image">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">🔫</div>
+                                <div>CCTV #24 - Weapon Detected</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div class="detection-type weapon">⚠️ Weapon Detection</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">
+                                Location: Bandra Station Platform 2<br>
+                                Confidence: 94.2% | Model: YOLOv8<br>
+                                Time: 5 minutes ago
+                            </div>
+                            <button class="btn btn-danger btn-small" style="width: 100%;">🚨 Dispatch Unit</button>
+                        </div>
+                    </div>
+
+                    <div class="detection-card">
+                        <div class="detection-image">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">👥</div>
+                                <div>CCTV #15 - Crowd Analysis</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div class="detection-type suspicious">🟡 Suspicious Behavior</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">
+                                Location: Marine Drive Junction<br>
+                                Crowd Density: 127 people/m²<br>
+                                Confidence: 78.5%
+                            </div>
+                            <button class="btn btn-primary btn-small" style="width: 100%;">👁️ Monitor</button>
+                        </div>
+                    </div>
+
+                    <div class="detection-card">
+                        <div class="detection-image">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">🥊</div>
+                                <div>CCTV #08 - Violence Alert</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div class="detection-type violence">🟠 Violence Alert</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">
+                                Location: Gateway of India Area<br>
+                                Confidence: 87.3% | Type: Physical Fight<br>
+                                Time: 12 minutes ago
+                            </div>
+                            <button class="btn btn-danger btn-small" style="width: 100%;">🚨 Dispatch Unit</button>
+                        </div>
+                    </div>
+
+                    <div class="detection-card">
+                        <div class="detection-image">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">🚗</div>
+                                <div>CCTV #31 - Vehicle Alert</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div class="detection-type weapon">🔴 Stolen Vehicle Match</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 8px;">
+                                License: MH-02-XX-1234<br>
+                                Location: Western Express Highway<br>
+                                Database Match: 96.1%
+                            </div>
+                            <button class="btn btn-danger btn-small" style="width: 100%;">🚓 Intercept</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🧠 Detection Capabilities</h2>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                    <div style="padding: 16px; background: rgba(220, 38, 38, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🔫</div>
+                        <div style="font-weight: 600;">Weapon Detection</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">Firearms, knives, explosives</div>
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(234, 88, 12, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🥊</div>
+                        <div style="font-weight: 600;">Violence Detection</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">Fights, assaults, threats</div>
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(30, 64, 175, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">👤</div>
+                        <div style="font-weight: 600;">Face Recognition</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">Suspect identification</div>
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(22, 163, 74, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🚗</div>
+                        <div style="font-weight: 600;">Vehicle Tracking</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">License plate detection</div>
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(234, 179, 8, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">👥</div>
+                        <div style="font-weight: 600;">Crowd Analysis</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">Unusual movements</div>
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(168, 85, 247, 0.1); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🎒</div>
+                        <div style="font-weight: 600;">Object Detection</div>
+                        <div style="color: var(--text-muted); font-size: 12px;">Unattended bags, objects</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="prediction-chart">
+                <div class="section-header">
+                    <h2 class="section-title">🗺️ Crime Prediction Heatmap</h2>
+                    <select class="form-input" style="width: 200px;">
+                        <option>Last 24 Hours</option>
+                        <option>Last 7 Days</option>
+                        <option>Last 30 Days</option>
+                        <option>Custom Range</option>
+                    </select>
+                </div>
+                <div class="chart-placeholder">
+                    📊 Crime prediction model analyzing historical patterns...<br><br>
+                    <strong>High-risk areas identified:</strong><br>
+                    🔴 Bandra (Risk Score: 92%)<br>
+                    🔴 Andheri (Risk Score: 85%)<br>
+                    🟡 Marine Drive (Risk Score: 78%)<br>
+                    🟢 Colaba (Risk Score: 45%)
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-title">Total Incidents (30 days)</div>
+                    <div class="stat-value">248</div>
+                    <div class="stat-change positive">-12% from last month</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-title">High Risk Areas</div>
+                    <div class="stat-value">5</div>
+                    <div class="stat-change positive">Constant monitoring</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-title">Prevention Rate</div>
+                    <div class="stat-value">67%</div>
+                    <div class="stat-change positive">+8% improvement</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-title">AI Accuracy</div>
+                    <div class="stat-value">94.8%</div>
+                    <div class="stat-change positive">Model v8.2</div>
+                </div>
+            </div>
+
+            <div class="prediction-chart">
+                <div class="section-header">
+                    <h2 class="section-title">📈 Crime Trends Analysis</h2>
+                </div>
+                <div class="chart-placeholder">
+                    🕐 Peak crime hours: 10 PM - 2 AM (weekends)<br>
+                    📍 Most affected zones: Zone 2 (Bandra), Zone 4 (Andheri)<br>
+                    📊 Trend: -15% crime rate reduction this quarter<br><br>
+                    <strong>Recommendation:</strong> Increase patrol units during peak hours
+                </div>
+            </div>
+
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🔍 NLP Crime Report Analysis</h2>
+                    <button class="btn btn-primary btn-small" onclick="runNLPAnalysis()">🔄 Refresh Analysis</button>
+                </div>
+                <div style="background: rgba(30, 64, 175, 0.1); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 12px;">📱 Recent Social Media Alerts</h3>
+                    <div style="color: var(--text-muted); font-size: 14px; line-height: 1.8;">
+                        • Detected 12 mentions of suspicious activity near Bandra station<br>
+                        • 5 posts about unusual crowd gathering at Marine Drive<br>
+                        • 3 emergency-related keywords detected in Andheri area<br>
+                        • Sentiment analysis shows increased public concern in Zone 4<br>
+                        • 8 trending hashtags related to public safety concerns
+                    </div>
+                </div>
+                <button class="btn btn-primary">📄 Generate Full Analysis Report</button>
+                <button class="btn btn-success" style="margin-left: 10px;">📧 Email Report</button>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports" class="tab-content">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">📝 File Crime Report</h2>
+                </div>
+                <form onsubmit="submitReport(event)">
+                    <div class="form-group">
+                        <label class="form-label">Incident Type</label>
+                        <select class="form-input" id="reportType" required>
+                            <option value="">Select type...</option>
+                            <option>Theft</option>
+                            <option>Assault</option>
+                            <option>Vandalism</option>
+                            <option>Burglary</option>
+                            <option>Vehicle Theft</option>
+                            <option>Cyber Crime</option>
+                            <option>Suspicious Activity</option>
+                            <option>Drug Related</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-input" id="reportLocation" placeholder="Enter location or use GPS" required>
+                        <button type="button" class="btn btn-primary btn-small" style="margin-top: 8px;" onclick="getGPSLocation()">📍 Use My Location</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Date & Time of Incident</label>
+                        <input type="datetime-local" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-input" placeholder="Provide detailed description of the incident..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Upload Evidence (Photo/Video)</label>
+                        <input type="file" class="form-input" accept="image/*,video/*" multiple>
+                        <div style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">Max file size: 50MB | Accepted formats: JPG, PNG, MP4, MOV</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Witness Information (Optional)</label>
+                        <input type="text" class="form-input" placeholder="Name and contact of witnesses">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">📤 Submit Report</button>
+                </form>
+            </div>
+
+            <div class="alerts-section" style="margin-top: 30px;">
+                <div class="section-header">
+                    <h2 class="section-title">📋 Recent Incident Reports</h2>
+                    <div>
+                        <input type="text" id="incidentSearchInput" class="form-input" placeholder="Search reports..." style="width: 200px; margin-right: 10px;" oninput="filterIncidentReports()">
+                        <select id="incidentStatusFilter" class="form-input" style="width: 150px;" onchange="filterIncidentReports()">
+                            <option value="">All Status</option>
+                            <option value="Open">Open</option>
+                            <option value="Investigating">Investigating</option>
+                            <option value="Resolved">Resolved</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="incident-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incidentReportsTableBody">
+                            <tr>
+                                <td>INC-2024-001</td>
+                                <td>Theft</td>
+                                <td>Bandra West</td>
+                                <td><span class="badge badge-warning">Investigating</span></td>
+                                <td><span class="badge badge-danger">High</span></td>
+                                <td>2024-03-15</td>
+                                <td>
+                                    <button class="btn btn-primary btn-small" onclick="viewIncidentDetails('INC-2024-001')">View</button>
+                                    <button class="btn btn-success btn-small" onclick="updateIncidentStatus('INC-2024-001')">Update</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>INC-2024-002</td>
+                                <td>Assault</td>
+                                <td>Andheri East</td>
+                                <td><span class="badge badge-success">Resolved</span></td>
+                                <td><span class="badge badge-warning">Medium</span></td>
+                                <td>2024-03-14</td>
+                                <td>
+                                    <button class="btn btn-primary btn-small" onclick="viewIncidentDetails('INC-2024-002')">View</button>
+                                    <button class="btn btn-success btn-small" onclick="updateIncidentStatus('INC-2024-002')">Update</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>INC-2024-003</td>
+                                <td>Vandalism</td>
+                                <td>Marine Drive</td>
+                                <td><span class="badge badge-danger">Open</span></td>
+                                <td><span class="badge badge-success">Low</span></td>
+                                <td>2024-03-17</td>
+                                <td>
+                                    <button class="btn btn-primary btn-small" onclick="viewIncidentDetails('INC-2024-003')">View</button>
+                                    <button class="btn btn-success btn-small" onclick="updateIncidentStatus('INC-2024-003')">Update</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evidence Vault Tab (NEW) -->
+        <div id="evidence" class="tab-content">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">🔐 Evidence Vault</h2>
+                    <button class="btn btn-primary btn-small" onclick="uploadEvidence()">📤 Upload Evidence</button>
+                </div>
+                <div style="background: rgba(30, 64, 175, 0.1); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 12px;">🔒 Blockchain-Secured Evidence Storage</h3>
+                    <p style="color: var(--text-muted); font-size: 14px;">
+                        All evidence is stored with cryptographic hashing and blockchain verification to ensure tamper-proof chain of custody.
+                    </p>
+                </div>
+
+                <div class="detection-feed">
+                    <div class="detection-card">
+                        <div class="detection-image" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">📸</div>
+                                <div>Photo Evidence</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div style="font-weight: 600;">INC-2024-001 - Theft</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin: 8px 0;">
+                                Files: 3 photos<br>
+                                Uploaded: 2024-03-15<br>
+                                Hash: 0x7a4b...3c9f
+                            </div>
+                            <button class="btn btn-primary btn-small" style="width: 100%;">🔍 View Details</button>
+                        </div>
+                    </div>
+
+                    <div class="detection-card">
+                        <div class="detection-image" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">🎥</div>
+                                <div>Video Evidence</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div style="font-weight: 600;">INC-2024-002 - Assault</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin: 8px 0;">
+                                Files: 1 video (2.4 MB)<br>
+                                Uploaded: 2024-03-14<br>
+                                Hash: 0x9f2e...7d1a
+                            </div>
+                            <button class="btn btn-primary btn-small" style="width: 100%;">🔍 View Details</button>
+                        </div>
+                    </div>
+
+                    <div class="detection-card">
+                        <div class="detection-image" style="background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; margin-bottom: 10px;">📄</div>
+                                <div>Document Evidence</div>
+                            </div>
+                        </div>
+                        <div class="detection-info">
+                            <div style="font-weight: 600;">INC-2024-003 - Fraud</div>
+                            <div style="color: var(--text-muted); font-size: 14px; margin: 8px 0;">
+                                Files: 5 documents<br>
+                                Uploaded: 2024-03-13<br>
+                                Hash: 0x3e8c...5b2d
+                            </div>
+                            <button class="btn btn-primary btn-small" style="width: 100%;">🔍 View Details</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profile" class="tab-content">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">👤 User Profile</h2>
+                </div>
+                <form id="profileForm" onsubmit="updateProfile(event)">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="name" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" name="phone" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Profile Avatar</label>
+                        <input type="file" name="avatar" class="form-input" accept="image/*">
+                        <img id="profileAvatarPreview" src="" style="max-width: 120px; margin-top: 10px; display: none; border-radius: 8px;" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Notification Preferences</label>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" checked> Email notifications for incidents
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" checked> SMS alerts for emergencies
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox"> Push notifications
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">💾 Update Profile</button>
+                </form>
+                <div id="profileMsg" style="margin-top: 10px; display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Audit Log Tab -->
+        <div id="audit-log" class="tab-content">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h2 class="section-title">📜 Audit Log Viewer</h2>
+                    <button class="btn btn-primary btn-small" onclick="fetchAuditLogs()">🔄 Refresh</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="incident-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditLogTableBody">
+                            <tr>
+                                <td>admin@system.com</td>
+                                <td>Login</td>
+                                <td>Successful login</td>
+                                <td>192.168.1.1</td>
+                                <td>2024-03-17 10:23 AM</td>
+                            </tr>
+                            <tr>
+                                <td>officer@police.in</td>
+                                <td>Report Update</td>
+                                <td>Updated INC-2024-001 status</td>
+                                <td>192.168.1.5</td>
+                                <td>2024-03-17 09:15 AM</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Command Indicator -->
+    <div class="voice-indicator" id="voiceIndicator" onclick="toggleVoiceCommand()" style="display: none;">
+        🎤
+    </div>
+
+    <!-- Notification Popup -->
+    <div class="notification-popup" id="notificationPopup">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <div style="font-size: 24px;">🔔</div>
+            <div>
+                <div style="font-weight: 600;" id="notificationTitle">New Alert</div>
+                <div style="color: var(--text-muted); font-size: 14px;" id="notificationMessage">You have a new notification</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let currentUser = null;
+        let userRole = null;
+        let map = null;
+        let trackingMarker = null;
+        let trackingInterval = null;
+        let voiceRecognitionActive = false;
+        let speechSocket = null;
+        let speechRecognition = null;
+        let speechQueue = [];
+        let isSpeakingSpeechQueue = false;
+        let citizenPushToTalkActive = false;
+        let allIncidentReports = [];
+        let alarmAudioContext = null;
+        let alarmOscillator = null;
+        let alarmGainNode = null;
+        let alarmSweepTimer = null;
+        let alarmStopTimer = null;
+        const API_BASE = window.location.port === '3000' ? window.location.origin : 'http://localhost:3000';
+        let authToken = localStorage.getItem('crimeAiToken') || '';
+
+        const ROLE_FEATURES = {
+            citizen: {
+                label: 'Citizen',
+                tabs: ['dashboard', 'sos', 'reports', 'profile']
+            },
+            officer: {
+                label: 'Police Officer',
+                tabs: ['dashboard', 'sos', 'ai-detection', 'analytics', 'reports', 'evidence', 'profile']
+            },
+            admin: {
+                label: 'Admin',
+                tabs: ['dashboard', 'sos', 'reports', 'profile', 'audit-log']
+            }
+        };
+
+        async function apiRequest(endpoint, options = {}) {
+            const headers = options.headers || {};
+            if (authToken) {
+                headers.Authorization = `Bearer ${authToken}`;
+            }
+
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                ...options,
+                headers
+            });
+
+            const contentType = response.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json') ? await response.json() : null;
+            if (!response.ok) {
+                throw new Error(payload?.message || `Request failed with status ${response.status}`);
+            }
+            return payload;
+        }
+
+        // Show register overlay first
+        document.getElementById('registerOverlay').style.display = 'flex';
+        document.getElementById('mainLoginOverlay').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'none';
+        document.getElementById('mainHeader').style.display = 'none';
+
+        // Registration/Login switching
+        document.getElementById('showLoginBtn').onclick = function() {
+            document.getElementById('registerOverlay').style.display = 'none';
+            document.getElementById('mainLoginOverlay').style.display = 'flex';
+        };
+
+        document.getElementById('showRegisterBtn2').onclick = function() {
+            document.getElementById('mainLoginOverlay').style.display = 'none';
+            document.getElementById('registerOverlay').style.display = 'flex';
+        };
+
+        // Registration
+        document.getElementById('registerForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const username = form.reg_username.value.trim();
+            const password = form.reg_password.value;
+            const confirm = form.reg_confirm.value;
+            const role = form.reg_role.value;
+
+            if (!username || !password || !role) {
+                document.getElementById('registerErrorMsg').textContent = 'All fields are required.';
+                document.getElementById('registerErrorMsg').style.display = 'block';
+                return;
+            }
+
+            if (password !== confirm) {
+                document.getElementById('registerErrorMsg').textContent = 'Passwords do not match.';
+                document.getElementById('registerErrorMsg').style.display = 'block';
+                return;
+            }
+
+            try {
+                await apiRequest('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role })
+                });
+
+                document.getElementById('registerErrorMsg').style.display = 'none';
+                document.getElementById('registerSuccessMsg').textContent = 'Registration successful! You can now log in.';
+                document.getElementById('registerSuccessMsg').style.display = 'block';
+
+                setTimeout(() => {
+                    document.getElementById('registerOverlay').style.display = 'none';
+                    document.getElementById('mainLoginOverlay').style.display = 'flex';
+                    document.getElementById('registerSuccessMsg').style.display = 'none';
+                    form.reset();
+                }, 1200);
+            } catch (error) {
+                document.getElementById('registerErrorMsg').textContent = error.message || 'Registration failed.';
+                document.getElementById('registerErrorMsg').style.display = 'block';
+            }
+        };
+
+        // Login
+        document.getElementById('mainLoginForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const form = e.target;
+            const username = form.username.value.trim();
+            const password = form.password.value;
+            const role = form.role.value;
+
+            if (!username || !password || !role) {
+                document.getElementById('loginErrorMsg').textContent = 'All fields are required.';
+                document.getElementById('loginErrorMsg').style.display = 'block';
+                return;
+            }
+
+            try {
+                const data = await apiRequest('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (data.role && role !== data.role) {
+                    throw new Error(`Account role is ${data.role}. Please choose the correct role.`);
+                }
+
+                authToken = data.token || '';
+                localStorage.setItem('crimeAiToken', authToken);
+                document.getElementById('loginErrorMsg').style.display = 'none';
+                showDashboardAfterLogin(username, data.role || role);
+                form.reset();
+            } catch (error) {
+                document.getElementById('loginErrorMsg').textContent = error.message || 'Login failed.';
+                document.getElementById('loginErrorMsg').style.display = 'block';
+            }
+        };
+
+        function showDashboardAfterLogin(user, role) {
+            currentUser = user;
+            userRole = role;
+
+            document.getElementById('mainLoginOverlay').style.display = 'none';
+            document.getElementById('registerOverlay').style.display = 'none';
+            document.getElementById('mainHeader').style.display = '';
+            document.getElementById('mainContainer').style.display = '';
+            document.getElementById('voiceIndicator').style.display = 'flex';
+
+            const bar = document.getElementById('userDetailsBar');
+            bar.style.display = '';
+            let roleLabel = ROLE_FEATURES[role]?.label || 'Citizen';
+            bar.innerHTML = `
+                <span class="status-badge status-active">● ${roleLabel}</span>
+                <span style='color: var(--text-muted); font-size: 14px;'>${user}</span>
+                <button class="btn btn-danger btn-small" onclick="logout()">Logout</button>
+            `;
+
+            applyRoleFeatures(role);
+            updateCitizenSpeechFeedVisibility(role);
+            updateCitizenMicVisibility(role);
+            requestSpeechNotificationPermission(role);
+
+            switchTab('dashboard');
+            initializeMap();
+            simulateRealTimeUpdates();
+            refreshAlerts();
+            loadContacts();
+            loadReports();
+            connectSpeechSocket();
+        }
+
+        function logout() {
+            currentUser = null;
+            userRole = null;
+            stopEmergencyAlarm();
+            disconnectSpeechSocket();
+            authToken = '';
+            localStorage.removeItem('crimeAiToken');
+            document.getElementById('mainLoginOverlay').style.display = 'flex';
+            document.getElementById('mainHeader').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('voiceIndicator').style.display = 'none';
+            updateCitizenSpeechFeedVisibility(null);
+            updateCitizenMicVisibility(null);
+        }
+
+        function connectSpeechSocket() {
+            if (speechSocket || typeof io !== 'function') {
+                return;
+            }
+
+            speechSocket = io(API_BASE, {
+                auth: { token: authToken },
+                transports: ['websocket']
+            });
+
+            speechSocket.on('citizen-speech', (event) => {
+                if (!event || userRole === 'citizen') {
+                    return;
+                }
+
+                const text = String(event.text || '').trim();
+                if (!text) {
+                    return;
+                }
+
+                appendCitizenSpeechEntry(event);
+                showNotification(`Citizen Speech from ${event.username || 'Citizen'}`, text);
+                showSpeechNotification(event);
+                queueSpeak(`Citizen ${event.username || 'speaker'} says: ${text}`);
+            });
+
+            speechSocket.on('connect_error', (error) => {
+                console.warn('Speech socket connection failed:', error.message);
+            });
+        }
+
+        function disconnectSpeechSocket() {
+            if (speechSocket) {
+                speechSocket.disconnect();
+                speechSocket = null;
+            }
+        }
+
+        function queueSpeak(text) {
+            speechQueue.push(text);
+            if (!isSpeakingSpeechQueue) {
+                speakNextQueuedMessage();
+            }
+        }
+
+        function updateCitizenSpeechFeedVisibility(role) {
+            const section = document.getElementById('citizenSpeechSection');
+            if (!section) return;
+            section.style.display = role === 'officer' || role === 'admin' ? '' : 'none';
+        }
+
+        function updateCitizenMicVisibility(role) {
+            const section = document.getElementById('citizenMicSection');
+            if (!section) return;
+            section.style.display = role === 'citizen' ? '' : 'none';
+        }
+
+        async function requestSpeechNotificationPermission(role) {
+            if ((role === 'officer' || role === 'admin') && 'Notification' in window && Notification.permission === 'default') {
+                try {
+                    await Notification.requestPermission();
+                } catch (_) {
+                    // Ignore permission request failures.
+                }
+            }
+        }
+
+        function showSpeechNotification(event) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                return;
+            }
+
+            const notification = new Notification(`Citizen Speech from ${event.username || 'Citizen'}`, {
+                body: String(event.text || '').trim(),
+                tag: 'citizen-speech',
+                renotify: true
+            });
+
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+            };
+
+            setTimeout(() => notification.close(), 6000);
+        }
+
+        function setCitizenMicStatus(message) {
+            const status = document.getElementById('citizenMicStatus');
+            if (status) {
+                status.textContent = message;
+            }
+        }
+
+        function appendCitizenSpeechEntry(event) {
+            const feed = document.getElementById('citizenSpeechFeed');
+            if (!feed) return;
+
+            if (feed.querySelector('.speech-feed-empty')) {
+                feed.innerHTML = '';
+            }
+
+            const item = document.createElement('div');
+            item.className = 'alert-item';
+            item.innerHTML = `
+                <div class="alert-content">
+                    <div class="alert-type">${event.username || 'Citizen'}</div>
+                    <div class="alert-details">${event.text}</div>
+                    <div class="alert-time">${new Date(event.timestamp || Date.now()).toLocaleTimeString()}</div>
+                </div>
+            `;
+
+            feed.prepend(item);
+        }
+
+        function clearCitizenSpeechFeed() {
+            const feed = document.getElementById('citizenSpeechFeed');
+            if (!feed) return;
+
+            feed.innerHTML = `
+                <div class="alert-item speech-feed-empty">
+                    <div class="alert-content">
+                        <div class="alert-type">Waiting for citizen speech</div>
+                        <div class="alert-details">Citizen microphone messages will appear here and be spoken aloud for officers and admins.</div>
+                        <div class="alert-time">Live feed</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function speakNextQueuedMessage() {
+            if (!speechQueue.length) {
+                isSpeakingSpeechQueue = false;
+                return;
+            }
+
+            isSpeakingSpeechQueue = true;
+            const message = speechQueue.shift();
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            utterance.onend = () => speakNextQueuedMessage();
+            utterance.onerror = () => speakNextQueuedMessage();
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function ensureSpeechRecognition() {
+            if (speechRecognition) {
+                return speechRecognition;
+            }
+
+            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                return null;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = false;
+            speechRecognition.lang = 'en-US';
+
+            speechRecognition.onresult = function(event) {
+                const last = event.results.length - 1;
+                const transcript = event.results[last][0].transcript.trim();
+                const command = transcript.toLowerCase();
+
+                if (userRole === 'citizen' && transcript && speechSocket) {
+                    const urgent = /\b(emergency|sos|help|danger|police|attack|fire|injury)\b/i.test(transcript);
+                    speechSocket.emit('citizen-speech', {
+                        username: currentUser,
+                        text: transcript,
+                        urgent
+                    });
+                }
+
+                if (command.includes('emergency') || command.includes('sos')) {
+                    triggerSOS();
+                } else if (command.includes('dashboard')) {
+                    switchTab('dashboard');
+                } else if (command.includes('report')) {
+                    switchTab('reports');
+                }
+            };
+
+            speechRecognition.onerror = function() {
+                citizenPushToTalkActive = false;
+                setCitizenMicStatus('Mic stopped');
+            };
+
+            speechRecognition.onend = function() {
+                if (citizenPushToTalkActive) {
+                    try {
+                        speechRecognition.start();
+                    } catch (_) {
+                        // Ignore restart failures.
+                    }
+                }
+            };
+
+            return speechRecognition;
+        }
+
+        function startCitizenPushToTalk() {
+            if (userRole !== 'citizen') return;
+            connectSpeechSocket();
+
+            const recognition = ensureSpeechRecognition();
+            if (!recognition) {
+                showNotification('Mic unavailable', 'Your browser does not support speech recognition.');
+                return;
+            }
+
+            citizenPushToTalkActive = true;
+            setCitizenMicStatus('Listening... release to stop');
+
+            try {
+                recognition.start();
+            } catch (_) {
+                // Already started or blocked by browser state.
+            }
+        }
+
+        function stopCitizenPushToTalk() {
+            citizenPushToTalkActive = false;
+            setCitizenMicStatus('Mic idle');
+
+            if (speechRecognition) {
+                try {
+                    speechRecognition.stop();
+                } catch (_) {
+                    // Ignore stop errors.
+                }
+            }
+        }
+
+        function applyRoleFeatures(role) {
+            const allowedTabs = new Set(ROLE_FEATURES[role]?.tabs || ROLE_FEATURES.citizen.tabs);
+
+            document.querySelectorAll('.tab').forEach(tab => {
+                const tabTarget = (tab.getAttribute('onclick') || '').match(/switchTab\('([^']+)'\)/)?.[1];
+                if (!tabTarget) return;
+                tab.style.display = allowedTabs.has(tabTarget) ? '' : 'none';
+            });
+
+            document.querySelectorAll('.tab-content').forEach(panel => {
+                if (!allowedTabs.has(panel.id)) {
+                    panel.classList.remove('active');
+                }
+            });
+
+            const auditTab = document.getElementById('auditLogTab');
+            if (auditTab) {
+                auditTab.style.display = allowedTabs.has('audit-log') ? '' : 'none';
+            }
+
+            if (role !== 'officer') {
+                const evidenceTab = Array.from(document.querySelectorAll('.tab')).find(btn => (btn.getAttribute('onclick') || '').includes("evidence"));
+                if (evidenceTab) evidenceTab.style.display = 'none';
+            }
+
+            if (role === 'citizen') {
+                const aiTab = Array.from(document.querySelectorAll('.tab')).find(btn => (btn.getAttribute('onclick') || '').includes("ai-detection"));
+                const analyticsTab = Array.from(document.querySelectorAll('.tab')).find(btn => (btn.getAttribute('onclick') || '').includes("analytics"));
+                if (aiTab) aiTab.style.display = 'none';
+                if (analyticsTab) analyticsTab.style.display = 'none';
+            }
+        }
+
+        function stopEmergencyAlarm() {
+            if (alarmSweepTimer) {
+                clearInterval(alarmSweepTimer);
+                alarmSweepTimer = null;
+            }
+
+            if (alarmStopTimer) {
+                clearTimeout(alarmStopTimer);
+                alarmStopTimer = null;
+            }
+
+            if (alarmOscillator) {
+                try {
+                    alarmOscillator.stop();
+                } catch (_) {
+                    // Ignore if oscillator already stopped.
+                }
+                alarmOscillator.disconnect();
+                alarmOscillator = null;
+            }
+
+            if (alarmGainNode) {
+                alarmGainNode.disconnect();
+                alarmGainNode = null;
+            }
+        }
+
+        // Starts the alarm and runs indefinitely until stopEmergencyAlarm() is called.
+        function startEmergencyAlarm() {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+
+            if (!alarmAudioContext) {
+                alarmAudioContext = new AudioCtx();
+            }
+
+            if (alarmAudioContext.state === 'suspended') {
+                alarmAudioContext.resume();
+            }
+
+            stopEmergencyAlarm(); // clear any previous instance
+
+            alarmOscillator = alarmAudioContext.createOscillator();
+            alarmGainNode = alarmAudioContext.createGain();
+
+            alarmOscillator.type = 'sawtooth';
+            alarmOscillator.frequency.setValueAtTime(740, alarmAudioContext.currentTime);
+            alarmGainNode.gain.setValueAtTime(0.0001, alarmAudioContext.currentTime);
+            alarmGainNode.gain.exponentialRampToValueAtTime(0.5, alarmAudioContext.currentTime + 0.06);
+
+            alarmOscillator.connect(alarmGainNode);
+            alarmGainNode.connect(alarmAudioContext.destination);
+            alarmOscillator.start();
+
+            let highTone = false;
+            alarmSweepTimer = setInterval(() => {
+                if (!alarmOscillator || !alarmAudioContext) return;
+                highTone = !highTone;
+                const targetFrequency = highTone ? 1320 : 740;
+                alarmOscillator.frequency.setTargetAtTime(targetFrequency, alarmAudioContext.currentTime, 0.05);
+            }, 230);
+            // NOTE: No auto-stop timer — alarm runs until stopEmergencyAlarm() is called.
+        }
+
+        // Hold-to-alarm SOS logic
+        let sosActive = false;
+
+        function startSOS(e) {
+            if (e) e.preventDefault();
+            if (sosActive) return;
+            sosActive = true;
+
+            const btn = document.getElementById('sosMainBtn');
+            const hint = document.getElementById('sosHintText');
+            if (btn) {
+                btn.style.background = '#dc2626';
+                btn.style.color = '#fff';
+                btn.style.boxShadow = '0 0 0 12px rgba(220,38,38,0.35), 0 0 40px rgba(220,38,38,0.6)';
+            }
+            if (hint) hint.textContent = '🚨 ALARM ACTIVE — Release to stop';
+
+            startEmergencyAlarm();
+            triggerSOS();
+        }
+
+        function stopSOS() {
+            if (!sosActive) return;
+            sosActive = false;
+
+            const btn = document.getElementById('sosMainBtn');
+            const hint = document.getElementById('sosHintText');
+            if (btn) {
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.style.boxShadow = '';
+            }
+            if (hint) hint.textContent = '🔴 Hold the SOS button to sound the alarm';
+
+            stopEmergencyAlarm();
+        }
+
+        function initializeMap() {
+            if (map) return;
+            
+            map = L.map('map').setView([19.0760, 72.8777], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            const incidents = [
+                { lat: 19.0596, lng: 72.8295, type: 'SOS', desc: 'Emergency Alert - Andheri West' },
+                { lat: 19.0544, lng: 72.8406, type: 'Weapon', desc: 'Weapon Detected - Bandra Station' },
+                { lat: 19.0760, lng: 72.8777, type: 'Suspicious', desc: 'Suspicious Activity - Marine Drive' },
+                { lat: 18.9220, lng: 72.8347, type: 'Vehicle', desc: 'Stolen Vehicle - Colaba' }
+            ];
+
+            const redIcon = L.icon({
+                iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNSIgaGVpZ2h0PSI0MSI+PHBhdGggZmlsbD0iI2RjMjYyNiIgZD0iTTEyLjUgMEMxOS40IDAgMjUgNS42IDI1IDEyLjVjMCAxMC41LTEyLjUgMjguNS0xMi41IDI4LjVTMCAyMyAwIDEyLjVDMCA1LjYgNS42IDAgMTIuNSAweiIvPjxjaXJjbGUgZmlsbD0iI2ZmZiIgY3g9IjEyLjUiIGN5PSIxMi41IiByPSI0Ii8+PC9zdmc+',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34]
+            });
+
+            incidents.forEach(incident => {
+                L.marker([incident.lat, incident.lng], { icon: redIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>${incident.type} Alert</b><br>${incident.desc}`);
+            });
+        }
+
+        function switchTab(tabName) {
+            if (userRole && !ROLE_FEATURES[userRole]?.tabs.includes(tabName)) {
+                showNotification('Access Restricted', 'That feature is not available for your role.');
+                return;
+            }
+
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            const tabBtn = Array.from(document.querySelectorAll('.tab')).find(btn => 
+                btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(tabName)
+            );
+            if (tabBtn) tabBtn.classList.add('active');
+
+            const tabContent = document.getElementById(tabName);
+            if (tabContent) tabContent.classList.add('active');
+
+            if (tabName === 'dashboard' && map) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        // SOS Emergency — dispatches the alert; alarm is managed by startSOS/stopSOS.
+        async function triggerSOS() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async position => {
+                    const { latitude, longitude } = position.coords;
+                    try {
+                        await apiRequest('/api/sos', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ latitude, longitude })
+                        });
+                    } catch (error) {
+                        showNotification('SOS Failed', error.message || 'Unable to send SOS alert');
+                        return;
+                    }
+
+                    showNotification('SOS Alert Sent!', `Emergency alert dispatched. Location: ${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`);
+                    
+                    if (map && trackingMarker) {
+                        map.removeLayer(trackingMarker);
+                    }
+                    
+                    const redIcon = L.icon({
+                        iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNSIgaGVpZ2h0PSI0MSI+PHBhdGggZmlsbD0iI2RjMjYyNiIgZD0iTTEyLjUgMEMxOS40IDAgMjUgNS42IDI1IDEyLjVjMCAxMC41LTEyLjUgMjguNS0xMi41IDI4LjVTMCAyMyAwIDEyLjVDMCA1LjYgNS42IDAgMTIuNSAweiIvPjxjaXJjbGUgZmlsbD0iI2ZmZiIgY3g9IjEyLjUiIGN5PSIxMi41IiByPSI0Ii8+PC9zdmc+',
+                        iconSize: [25, 41]
+                    });
+                    
+                    trackingMarker = L.marker([latitude, longitude], { icon: redIcon })
+                        .addTo(map)
+                        .bindPopup('🚨 YOUR EMERGENCY ALERT<br>Live tracking active<br>Help is on the way!')
+                        .openPopup();
+                    
+                    map.setView([latitude, longitude], 15);
+                    startLiveTracking();
+                    
+                    const alertsDiv = document.getElementById('alertsList');
+                    const newAlert = document.createElement('div');
+                    newAlert.className = 'alert-item';
+                    newAlert.innerHTML = `
+                        <div class="alert-content">
+                            <div class="alert-type">🔴 SOS Emergency Alert - YOU</div>
+                            <div class="alert-details">Location: ${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E</div>
+                            <div class="alert-time">Just now</div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-success btn-small">Help Dispatched</button>
+                        </div>
+                    `;
+                    alertsDiv.insertBefore(newAlert, alertsDiv.firstChild);
+                    document.getElementById('activeAlerts').textContent = String(parseInt(document.getElementById('activeAlerts').textContent) + 1);
+                    
+                    switchTab('dashboard');
+                }, error => {
+                    showNotification('Location Error', 'Unable to get your location. Please enable GPS.');
+                });
+            } else {
+                showNotification('Error', 'Geolocation is not supported by your browser.');
+            }
+        }
+
+        function startLiveTracking() {
+            trackingInterval = setInterval(() => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        const { latitude, longitude } = position.coords;
+                        if (trackingMarker) {
+                            trackingMarker.setLatLng([latitude, longitude]);
+                        }
+                    });
+                }
+            }, 3000);
+        }
+
+        // Voice Command
+        function toggleVoiceCommand() {
+            const indicator = document.getElementById('voiceIndicator');
+            voiceRecognitionActive = !voiceRecognitionActive;
+            
+            if (voiceRecognitionActive) {
+                indicator.classList.add('active');
+                showNotification('Voice Command Active', 'Listening for commands...');
+                startVoiceRecognition();
+            } else {
+                indicator.classList.remove('active');
+                showNotification('Voice Command Inactive', 'Voice recognition stopped');
+            }
+        }
+
+        function startVoiceRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (userRole === 'citizen') {
+                    connectSpeechSocket();
+                }
+
+                speechRecognition = new SpeechRecognition();
+                speechRecognition.continuous = true;
+                speechRecognition.interimResults = false;
+                speechRecognition.lang = 'en-US';
+
+                speechRecognition.onresult = function(event) {
+                    const last = event.results.length - 1;
+                    const transcript = event.results[last][0].transcript.trim();
+                    const command = transcript.toLowerCase();
+
+                    if (userRole === 'citizen' && transcript && speechSocket) {
+                        speechSocket.emit('citizen-speech', {
+                            username: currentUser,
+                            text: transcript
+                        });
+                    }
+                    
+                    if (command.includes('emergency') || command.includes('sos')) {
+                        triggerSOS();
+                    } else if (command.includes('dashboard')) {
+                        switchTab('dashboard');
+                    } else if (command.includes('report')) {
+                        switchTab('reports');
+                    }
+                };
+
+                speechRecognition.start();
+            } else {
+                alert('Voice recognition not supported in this browser');
+            }
+        }
+
+        // Notification System
+        function showNotification(title, message) {
+            const popup = document.getElementById('notificationPopup');
+            document.getElementById('notificationTitle').textContent = title;
+            document.getElementById('notificationMessage').textContent = message;
+            popup.style.display = 'block';
+
+            setTimeout(() => {
+                popup.style.display = 'none';
+            }, 5000);
+        }
+
+        // Real-time Updates Simulation
+        function simulateRealTimeUpdates() {
+            setInterval(() => {
+                const alerts = parseInt(document.getElementById('activeAlerts').textContent);
+                document.getElementById('activeAlerts').textContent = alerts + Math.floor(Math.random() * 3);
+            }, 30000);
+        }
+
+        // Power button double-click for SOS
+        let powerButtonClicks = 0;
+        let powerButtonTimer = null;
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'p' || e.key === 'P') {
+                powerButtonClicks++;
+                
+                if (powerButtonClicks === 1) {
+                    powerButtonTimer = setTimeout(() => {
+                        powerButtonClicks = 0;
+                    }, 500);
+                } else if (powerButtonClicks === 2) {
+                    clearTimeout(powerButtonTimer);
+                    powerButtonClicks = 0;
+                    triggerSOS();
+                    showNotification('Emergency SOS', 'Double power button press detected! Sending SOS...');
+                }
+            }
+        });
+
+        // Helper Functions
+        async function refreshAlerts() {
+            try {
+                const data = await apiRequest('/api/alerts');
+                const alerts = data.alerts || [];
+                const alertsDiv = document.getElementById('alertsList');
+                alertsDiv.innerHTML = '';
+
+                alerts.forEach(alert => {
+                    const item = document.createElement('div');
+                    item.className = 'alert-item';
+                    item.innerHTML = `
+                        <div class="alert-content">
+                            <div class="alert-type">${alert.type}</div>
+                            <div class="alert-details">${alert.location}</div>
+                            <div class="alert-time">${alert.time}</div>
+                        </div>
+                    `;
+                    alertsDiv.appendChild(item);
+                });
+
+                document.getElementById('activeAlerts').textContent = String(alerts.length);
+                showNotification('Success', 'Alerts updated successfully');
+            } catch (error) {
+                showNotification('Error', error.message || 'Failed to refresh alerts');
+            }
+        }
+
+        function respondToAlert(alertId) {
+            showNotification('Responding', `Dispatching unit for alert ${alertId}`);
+        }
+
+        function viewLocation(lat, lng) {
+            if (map) {
+                map.setView([lat, lng], 16);
+                switchTab('dashboard');
+            }
+        }
+
+        function viewDetection(detectionId) {
+            showNotification('Loading', `Opening CCTV feed for ${detectionId}`);
+        }
+
+        function startDetection() {
+            showNotification('AI Detection', 'Starting AI detection on all cameras...');
+        }
+
+        function stopDetection() {
+            showNotification('AI Detection', 'Detection paused');
+        }
+
+        function exportDetectionLog() {
+            showNotification('Export', 'Generating detection log...');
+        }
+
+        async function submitReport(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            try {
+                await apiRequest('/api/report', {
+                    method: 'POST',
+                    body: formData
+                });
+                showNotification('Report Submitted', 'Your report has been filed successfully');
+                form.reset();
+                loadReports();
+            } catch (error) {
+                showNotification('Report Failed', error.message || 'Unable to submit report');
+            }
+        }
+
+        function getGPSLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    document.getElementById('reportLocation').value = `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°E`;
+                });
+            }
+        }
+
+        function filterIncidentReports() {
+            const search = document.getElementById('incidentSearchInput').value.toLowerCase();
+            const status = document.getElementById('incidentStatusFilter').value;
+            
+            const rows = document.querySelectorAll('#incidentReportsTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const matchesSearch = text.includes(search);
+                const matchesStatus = !status || row.querySelector('.badge').textContent === status;
+                row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+            });
+        }
+
+        function viewIncidentDetails(incidentId) {
+            showNotification('Incident Details', `Loading details for ${incidentId}`);
+        }
+
+        function updateIncidentStatus(incidentId) {
+            showNotification('Update', `Updating status for ${incidentId}`);
+        }
+
+        async function addContact() {
+            const name = prompt('Enter contact name:');
+            const phone = prompt('Enter phone number:');
+            if (name && phone) {
+                try {
+                    await apiRequest('/api/contacts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, relation: 'Other', phone })
+                    });
+                    showNotification('Contact Added', `${name} added successfully`);
+                    loadContacts();
+                } catch (error) {
+                    showNotification('Contact Failed', error.message || 'Unable to add contact');
+                }
+            }
+        }
+
+        async function removeContact(phone) {
+            if (confirm('Remove this contact?')) {
+                try {
+                    await apiRequest('/api/contacts', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phone })
+                    });
+                    showNotification('Contact Removed', 'Emergency contact removed');
+                    loadContacts();
+                } catch (error) {
+                    showNotification('Contact Failed', error.message || 'Unable to remove contact');
+                }
+            }
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            const form = event.target;
+            const profileData = new FormData(form);
+            try {
+                await apiRequest('/api/profile', {
+                    method: 'POST',
+                    body: profileData
+                });
+                showNotification('Profile Updated', 'Your profile has been updated successfully');
+            } catch (error) {
+                showNotification('Profile Failed', error.message || 'Unable to update profile');
+            }
+        }
+
+        async function fetchAuditLogs() {
+            try {
+                const data = await apiRequest('/api/audit-logs');
+                const logs = data.logs || [];
+                const tbody = document.getElementById('auditLogTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    logs.forEach(log => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${log.user?.username || 'Unknown'}</td>
+                            <td>${log.action || '-'}</td>
+                            <td>${log.details || '-'}</td>
+                            <td>${log.ip || '-'}</td>
+                            <td>${new Date(log.createdAt).toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+                showNotification('Loaded', 'Audit logs fetched successfully');
+            } catch (error) {
+                showNotification('Access Denied', error.message || 'Unable to fetch audit logs');
+            }
+        }
+
+        async function loadContacts() {
+            try {
+                const data = await apiRequest('/api/contacts');
+                const contacts = data.contacts || [];
+                const tbody = document.getElementById('contactsTableBody');
+                if (!tbody) return;
+
+                tbody.innerHTML = '';
+                contacts.forEach(contact => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${contact.name}</td>
+                        <td>${contact.relation || 'Other'}</td>
+                        <td>${contact.phone}</td>
+                        <td><button class="btn btn-danger btn-small" onclick="removeContact('${contact.phone}')">Remove</button></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (_) {
+                // Keep UI usable if contacts API is temporarily unavailable.
+            }
+        }
+
+        async function loadReports() {
+            try {
+                const data = await apiRequest('/api/reports');
+                allIncidentReports = data.reports || [];
+                const tbody = document.getElementById('incidentReportsTableBody');
+                if (!tbody) return;
+
+                tbody.innerHTML = '';
+                allIncidentReports.forEach(report => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${report.id}</td>
+                        <td>${report.type}</td>
+                        <td>${report.location}</td>
+                        <td><span class="badge">${report.status}</span></td>
+                        <td>${report.date}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (_) {
+                // Keep static table content when API fails.
+            }
+        }
+
+        function runNLPAnalysis() {
+            showNotification('NLP Analysis', 'Running sentiment analysis on social media...');
+        }
+
+        function uploadEvidence() {
+            showNotification('Upload', 'Evidence upload interface opening...');
+        }
+
+        function deployNewUnit() {
+            showNotification('Dispatch', 'Deploying new patrol unit...');
+        }
+
+        console.log('🚨 AI Crime Detection System initialized');
+        console.log('💡 TIP: Press P key twice quickly to trigger emergency SOS');
+        console.log('🎤 Click microphone icon for voice commands');
+        console.log('✅ All systems operational');
+    </script>
+</body>
+</html>
