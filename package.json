@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "vercel-build": "echo 'No build step; frontend is static'"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -12,6 +13,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.0",
     "multer": "^2.1.1",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "dotenv": "^16.1.4"
   }
 }

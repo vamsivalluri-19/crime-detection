@@ -1,5 +1,12 @@
 // Simple Express backend for AI Crime Detection System
 
+// Load environment variables from .n
+try {
+  require('dotenv').config();
+} catch (_) {
+  // dotenv may not be installed in some environments; ignore
+}
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -21,8 +28,17 @@ const AuditLog = require('./models/AuditLog');
 const User = require('./models/User');
 const auditLogger = require('./middleware/auditLogger');
 
-mongoose.connect('mongodb://localhost:27017/crimeai').then(() => {
-  console.log('MongoDB connected successfully');
+// MongoDB connection: prefer MONGO_URI env var, fallback to local MongoDB for dev
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crimeai';
+
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true }).then(() => {
+  // Mask password when logging URI
+  try {
+    const masked = MONGO_URI.replace(/:\/\/.+@/, '://*****@');
+    console.log('MongoDB connected successfully to', masked);
+  } catch (_) {
+    console.log('MongoDB connected successfully');
+  }
 }).catch(err => {
   console.warn('MongoDB not available — running with in-memory data only:', err.message);
 });
