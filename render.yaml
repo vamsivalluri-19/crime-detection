@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: crime-detection-backend
+    env: node
+    plan: starter
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: MONGO_URI
+        value: "${MONGO_URI}"
+      - key: JWT_SECRET
+        value: "${JWT_SECRET}"
+    # Replace the placeholders above with real values in Render dashboard or via
+    # a secure deploy pipeline. Do NOT commit secrets into the repository.
+
+# Note: This is a simple Render manifest to help automated deployments from
+# GitHub. Adjust `plan`, `env`, and other properties per your account.

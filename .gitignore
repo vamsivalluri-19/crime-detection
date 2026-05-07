@@ -2,3 +2,9 @@ node_modules/
 uploads/
 .env
 *.log
+backend/uploads/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+coverage/
