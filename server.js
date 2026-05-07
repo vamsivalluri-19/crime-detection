@@ -31,7 +31,7 @@ const auditLogger = require('./middleware/auditLogger');
 // MongoDB connection: prefer MONGO_URI env var, fallback to local MongoDB for dev
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crimeai';
 
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true }).then(() => {
+mongoose.connect(MONGO_URI).then(() => {
   // Mask password when logging URI
   try {
     const masked = MONGO_URI.replace(/:\/\/.+@/, '://*****@');
