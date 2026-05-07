@@ -7,19 +7,25 @@ const mongoose = require('mongoose');
 const http = require('http');
 const socketio = require('socket.io');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server, { cors: { origin: '*' } });
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 const Profile = require('./models/Profile');
 const IncidentComment = require('./models/IncidentComment');
 const AuditLog = require('./models/AuditLog');
+const User = require('./models/User');
 const auditLogger = require('./middleware/auditLogger');
 
-mongoose.connect('mongodb://localhost:27017/crimeai');
+mongoose.connect('mongodb://localhost:27017/crimeai').then(() => {
+  console.log('MongoDB connected successfully');
+}).catch(err => {
+  console.warn('MongoDB not available — running with in-memory data only:', err.message);
+});
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -83,6 +89,56 @@ io.on('connection', (socket) => {
     io.emit('citizen-speech', speechEvent);
   });
 
+  socket.on('citizen-complaint', (payload = {}) => {
+    if (!socket.user || socket.user.role !== 'citizen') return;
+
+    const complaintEvent = {
+      trackerId: String(payload.trackerId || `${socket.user.id}-${Date.now()}`),
+      userId: socket.user.id,
+      role: socket.user.role,
+      username: payload.username || socket.user.username || 'Citizen',
+      citizenName: payload.citizenName || payload.username || socket.user.username || 'Citizen',
+      citizenPhone: payload.citizenPhone || '',
+      citizenDetails: payload.citizenDetails || '',
+      complaintType: payload.complaintType || 'Incident',
+      locationText: payload.locationText || '',
+      description: String(payload.description || '').trim(),
+      reportId: payload.reportId || null,
+      timestamp: new Date().toISOString()
+    };
+
+    io.emit('citizen-complaint', complaintEvent);
+  });
+
+  socket.on('citizen-live-location', (payload = {}) => {
+    if (!socket.user || socket.user.role !== 'citizen') return;
+
+    const latitude = Number(payload.latitude);
+    const longitude = Number(payload.longitude);
+    const ended = Boolean(payload.ended);
+
+    if (!ended && (!Number.isFinite(latitude) || !Number.isFinite(longitude))) {
+      return;
+    }
+
+    const liveLocationEvent = {
+      trackerId: String(payload.trackerId || `${socket.user.id}`),
+      userId: socket.user.id,
+      role: socket.user.role,
+      username: payload.username || socket.user.username || 'Citizen',
+      citizenName: payload.citizenName || payload.username || socket.user.username || 'Citizen',
+      citizenPhone: payload.citizenPhone || '',
+      complaintType: payload.complaintType || 'Incident',
+      locationText: payload.locationText || '',
+      latitude: ended ? null : latitude,
+      longitude: ended ? null : longitude,
+      ended,
+      timestamp: new Date().toISOString()
+    };
+
+    io.emit('citizen-live-location', liveLocationEvent);
+  });
+
   socket.on('disconnect', () => console.log('Client disconnected:', socket.id));
 });
 
@@ -98,18 +154,60 @@ app.get('/api/profile', async (req, res) => {
 });
 app.post('/api/profile', upload.single('avatar'), async (req, res) => {
   if (!req.user) return res.status(401).json({ success: false });
-  let update = { name: req.body.name };
+  let notificationPreferences = req.body.notificationPreferences;
+  if (typeof notificationPreferences === 'string') {
+    try {
+      notificationPreferences = JSON.parse(notificationPreferences);
+    } catch (_) {
+      notificationPreferences = undefined;
+    }
+  }
+
+  const update = {
+    name: req.body.name,
+    email: req.body.email,
+    phone: req.body.phone,
+    lastUpdated: new Date()
+  };
+
+  if (notificationPreferences && typeof notificationPreferences === 'object') {
+    update.notificationPreferences = {
+      emailIncidents: Boolean(notificationPreferences.emailIncidents),
+      smsEmergencies: Boolean(notificationPreferences.smsEmergencies),
+      pushNotifications: Boolean(notificationPreferences.pushNotifications)
+    };
+  }
+
   if (req.file) update.avatar = '/uploads/' + req.file.filename;
   const profile = await Profile.findOneAndUpdate(
     { user: req.user.id },
-    { $set: update },
+    { $set: update, $setOnInsert: { user: req.user.id } },
     { upsert: true, new: true }
   );
   res.json({ profile });
 });
 app.post('/api/profile/password', async (req, res) => {
-  // Change password logic (requires User model, omitted for brevity)
-  res.json({ success: true });
+  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Missing password fields' });
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const passwordMatches = await bcrypt.compare(currentPassword, user.password);
+  if (!passwordMatches) {
+    return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+  }
+
+  user.password = await bcrypt.hash(newPassword, 10);
+  await user.save();
+
+  res.json({ success: true, message: 'Password updated' });
 });
 
 // --- Incident Commenting & Status Updates ---
@@ -170,18 +268,43 @@ app.post('/api/login', (req, res) => {
 
 
 // SOS alert (with WebSocket broadcast)
-app.post('/api/sos', (req, res) => {
+app.post('/api/sos', async (req, res) => {
   const { latitude, longitude } = req.body;
   const id = 'SOS-' + (Math.floor(Math.random() * 1000) + 100);
-  const alert = {
+
+  const baseAlert = {
     id,
     type: 'SOS Emergency',
     location: `Lat: ${latitude}, Lng: ${longitude}`,
+    latitude: Number(latitude),
+    longitude: Number(longitude),
     time: 'Just now'
   };
-  alerts.unshift(alert);
-  emitAlert(alert);
-  res.json({ success: true, message: 'SOS alert received', data: alert });
+
+  // Attach caller profile when available so officers/admins can see who sent the SOS
+  let sosEvent = { ...baseAlert };
+  if (req.user) {
+    try {
+      const profile = await Profile.findOne({ user: req.user.id }).lean();
+      sosEvent.userId = req.user.id;
+      sosEvent.username = req.user.username || undefined;
+      if (profile) {
+        sosEvent.citizenName = profile.name || undefined;
+        sosEvent.citizenPhone = profile.phone || undefined;
+        sosEvent.avatar = profile.avatar || undefined;
+      }
+    } catch (err) {
+      // ignore profile lookup failures and continue
+    }
+  }
+
+  alerts.unshift(baseAlert);
+  emitAlert(baseAlert);
+
+  // Emit a dedicated socket event with profile for officer/admin clients
+  io.emit('citizen-sos', sosEvent);
+
+  res.json({ success: true, message: 'SOS alert received', data: sosEvent });
 });
 // Incident search/filter
 app.get('/api/incidents/search', (req, res) => {
@@ -274,10 +397,76 @@ app.get('/api/reports', (req, res) => {
   res.json({ reports });
 });
 app.post('/api/report', upload.array('evidence'), (req, res) => {
-  const { type, location, description } = req.body;
+  const {
+    type,
+    location,
+    description,
+    citizenName,
+    citizenPhone,
+    citizenDetails,
+    reportLatitude,
+    reportLongitude
+  } = req.body;
   const id = 'INC-' + Math.floor(Math.random() * 10000);
-  const report = { id, type, location, status: 'Open', date: new Date().toLocaleDateString() };
+  const lat = Number(reportLatitude);
+  const lng = Number(reportLongitude);
+  const reporterName = req.user?.username || citizenName || 'Citizen';
+  const report = {
+    id,
+    type,
+    location,
+    description,
+    citizenName: citizenName || reporterName,
+    citizenPhone: citizenPhone || '',
+    citizenDetails: citizenDetails || '',
+    reportLatitude: Number.isFinite(lat) ? lat : null,
+    reportLongitude: Number.isFinite(lng) ? lng : null,
+    reportedBy: reporterName,
+    reportedByRole: req.user?.role || 'citizen',
+    evidenceCount: Array.isArray(req.files) ? req.files.length : 0,
+    status: 'Open',
+    date: new Date().toLocaleDateString()
+  };
   reports.unshift(report);
+
+  emitAlert({
+    id: `CP-${Date.now()}`,
+    type: `${type || 'Incident'} Complaint`,
+    location: location || 'Location unavailable',
+    reportedBy: reporterName,
+    time: new Date().toLocaleString()
+  });
+
+  io.emit('citizen-complaint', {
+    trackerId: id,
+    reportId: id,
+    userId: req.user?.id || 'anonymous',
+    username: reporterName,
+    citizenName: citizenName || reporterName,
+    citizenPhone: citizenPhone || '',
+    citizenDetails: citizenDetails || '',
+    complaintType: type || 'Incident',
+    locationText: location || '',
+    description: description || '',
+    timestamp: new Date().toISOString()
+  });
+
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    io.emit('citizen-live-location', {
+      trackerId: id,
+      reportId: id,
+      userId: req.user?.id || 'anonymous',
+      username: reporterName,
+      citizenName: citizenName || reporterName,
+      citizenPhone: citizenPhone || '',
+      complaintType: type || 'Incident',
+      locationText: location || '',
+      latitude: lat,
+      longitude: lng,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   res.json({ success: true, message: 'Report submitted', reportId: id });
 });
 
@@ -309,6 +498,21 @@ app.delete('/api/contacts', (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-});
+function startServer(port) {
+  server.once('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.warn(`Port ${port} is already in use, trying ${port + 1}...`);
+      startServer(port + 1);
+      return;
+    }
+
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  });
+
+  server.listen(port, () => {
+    console.log(`Backend server running on http://localhost:${port}`);
+  });
+}
+
+startServer(PORT);
