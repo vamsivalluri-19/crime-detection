@@ -261,6 +261,24 @@ let currentUser = null;
             document.getElementById('registerOverlay').style.display = 'flex';
         };
 
+        function showLoginAfterRegister(message, username = '') {
+            document.getElementById('registerErrorMsg').textContent = message;
+            document.getElementById('registerErrorMsg').style.display = 'block';
+            document.getElementById('registerSuccessMsg').style.display = 'none';
+
+            if (username) {
+                const loginUsername = document.querySelector('#mainLoginForm input[name="username"]');
+                if (loginUsername) {
+                    loginUsername.value = username;
+                }
+            }
+
+            setTimeout(() => {
+                document.getElementById('registerOverlay').style.display = 'none';
+                document.getElementById('mainLoginOverlay').style.display = 'flex';
+            }, 1200);
+        }
+
         // Registration
         document.getElementById('registerForm').onsubmit = async function(e) {
             e.preventDefault();
@@ -300,7 +318,13 @@ let currentUser = null;
                     form.reset();
                 }, 1200);
             } catch (error) {
-                document.getElementById('registerErrorMsg').textContent = error.message || 'Registration failed.';
+                const message = error.message || 'Registration failed.';
+                if (String(message).toLowerCase().includes('already exists') || String(message).includes('409')) {
+                    showLoginAfterRegister('Account already exists. Please log in.', username);
+                    return;
+                }
+
+                document.getElementById('registerErrorMsg').textContent = message;
                 document.getElementById('registerErrorMsg').style.display = 'block';
             }
         };
