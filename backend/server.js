@@ -37,25 +37,39 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-const Profile = require('./models/Profile');
-const IncidentComment = require('./models/IncidentComment');
-const AuditLog = require('./models/AuditLog');
-const User = require('./models/User');
-const auditLogger = require('./middleware/auditLogger');
+// Load models with error handling
+let Profile, IncidentComment, AuditLog, User, auditLogger;
+try {
+  Profile = require('./models/Profile');
+  IncidentComment = require('./models/IncidentComment');
+  AuditLog = require('./models/AuditLog');
+  User = require('./models/User');
+  auditLogger = require('./middleware/auditLogger');
+  console.log('[STARTUP] Models and middleware loaded successfully');
+} catch (err) {
+  console.error('[STARTUP ERROR] Failed to load models:', err.message);
+  // Provide defaults so app can still start
+  auditLogger = (req, res, next) => next();
+  console.log('[STARTUP] Using fallback middleware, continuing startup...');
+}
 
 // MongoDB connection: prefer MONGO_URI env var, fallback to local MongoDB for dev
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crimeai';
+
+console.log('[STARTUP] MONGO_URI configured');
+console.log('[STARTUP] Node environment:', process.env.NODE_ENV || 'not set');
+console.log('[STARTUP] PORT:', PORT);
 
 mongoose.connect(MONGO_URI).then(() => {
   // Mask password when logging URI
   try {
     const masked = MONGO_URI.replace(/:\/\/.+@/, '://*****@');
-    console.log('MongoDB connected successfully to', masked);
+    console.log('[STARTUP] MongoDB connected successfully to', masked);
   } catch (_) {
-    console.log('MongoDB connected successfully');
+    console.log('[STARTUP] MongoDB connected successfully');
   }
 }).catch(err => {
-  console.warn('MongoDB not available — running with in-memory data only:', err.message);
+  console.warn('[STARTUP] MongoDB not available — running with in-memory data only:', err.message);
 });
 
 app.use((req, res, next) => {
@@ -100,8 +114,25 @@ app.use((req, res, next) => {
 // File upload setup
 const upload = multer({ dest: 'uploads/' });
 
+// Ensure uploads directory exists
+try {
+  const fs = require('fs');
+  if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads', { recursive: true });
+    console.log('[STARTUP] Created uploads directory');
+  }
+} catch (err) {
+  console.warn('[STARTUP] Warning: Could not create uploads directory:', err.message);
+}
+
 // Auth routes
-require('./auth')(app, JWT_SECRET);
+try {
+  require('./auth')(app, JWT_SECRET);
+  console.log('[STARTUP] Auth routes loaded successfully');
+} catch (err) {
+  console.error('[STARTUP ERROR] Failed to load auth routes:', err.message);
+  process.exit(1);
+}
 
 // Audit log middleware
 app.use(auditLogger);
@@ -802,22 +833,39 @@ app.use((err, req, res, next) => {
 
 // Start server
 function startServer(port) {
+  console.log(`[STARTUP] Attempting to start server on port ${port}...`);
+  
   server.once('error', (error) => {
     if (error.code === 'EADDRINUSE') {
-      console.warn(`Port ${port} is already in use, trying ${port + 1}...`);
+      console.warn(`[STARTUP] Port ${port} is already in use, trying ${port + 1}...`);
       startServer(port + 1);
       return;
     }
 
-    console.error('Failed to start server:', error.message);
+    console.error(`[STARTUP ERROR] Failed to start server on port ${port}:`, error.message);
+    console.error(error.stack);
     process.exit(1);
   });
 
-  server.listen(port, () => {
-    console.log(`Crime Detection System running on http://localhost:${port}`);
-    console.log(`Frontend: http://localhost:${port}`);
-    console.log(`API: http://localhost:${port}/api`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[STARTUP SUCCESS] Crime Detection System running on http://0.0.0.0:${port}`);
+    console.log(`[STARTUP] API: http://0.0.0.0:${port}/api`);
+    console.log(`[STARTUP] Health check: http://0.0.0.0:${port}/api/health`);
   });
 }
 
+// Catch uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+// Catch unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+console.log('[STARTUP] Starting application...');
 startServer(PORT);
