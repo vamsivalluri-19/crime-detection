@@ -3,6 +3,16 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 
+const memoryUsers = new Map();
+
+function isMongoConnected() {
+  return mongoose.connection && mongoose.connection.readyState === 1;
+}
+
+function makeUserPayload(user) {
+  return { username: user.username, role: user.role };
+}
+
 module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
   // Register
   app.post('/api/register', async (req, res) => {
@@ -19,12 +29,45 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
     }
 
     const hash = await bcrypt.hash(password, 10);
+
+    if (!isMongoConnected()) {
+      if (memoryUsers.has(username)) {
+        return res.status(409).json({ success: false, message: 'User already exists' });
+      }
+
+      const user = {
+        _id: new mongoose.Types.ObjectId(),
+        username,
+        password: hash,
+        role
+      };
+
+      memoryUsers.set(username, user);
+      return res.json({ success: true, user: makeUserPayload(user) });
+    }
+
     try {
       const user = await User.create({ username, password: hash, role });
-      res.json({ success: true, user: { username: user.username, role: user.role } });
+      res.json({ success: true, user: makeUserPayload(user) });
     } catch (e) {
       if (e && e.code === 11000) {
         return res.status(409).json({ success: false, message: 'User already exists' });
+      }
+
+      if (String(e?.message || '').toLowerCase().includes('buffering timed out')) {
+        if (memoryUsers.has(username)) {
+          return res.status(409).json({ success: false, message: 'User already exists' });
+        }
+
+        const user = {
+          _id: new mongoose.Types.ObjectId(),
+          username,
+          password: hash,
+          role
+        };
+
+        memoryUsers.set(username, user);
+        return res.json({ success: true, user: makeUserPayload(user) });
       }
 
       res.status(400).json({ success: false, message: e.message || 'Unable to register user' });
@@ -40,7 +83,22 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
       return res.status(400).json({ success: false, message: 'Username and password are required' });
     }
 
-    const user = await User.findOne({ username });
+    let user = null;
+
+    if (isMongoConnected()) {
+      try {
+        user = await User.findOne({ username });
+      } catch (e) {
+        if (!String(e?.message || '').toLowerCase().includes('buffering timed out')) {
+          throw e;
+        }
+      }
+    }
+
+    if (!user) {
+      user = memoryUsers.get(username) || null;
+    }
+
     if (!user) return res.status(400).json({ success: false, message: 'Invalid credentials' });
 
     const match = await bcrypt.compare(password, user.password);
