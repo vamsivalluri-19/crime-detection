@@ -61,38 +61,38 @@ function makeUserPayload(user) {
 module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
   // Register
   app.post('/api/register', async (req, res) => {
-    const username = String(req.body.username || '').trim();
-    const password = String(req.body.password || '');
-    const role = String(req.body.role || 'citizen').trim() || 'citizen';
+    try {
+      const username = String(req.body.username || '').trim();
+      const password = String(req.body.password || '');
+      const role = String(req.body.role || 'citizen').trim() || 'citizen';
 
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username and password are required' });
-    }
-
-    if (!['admin', 'officer', 'citizen'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Invalid role selected' });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-
-    if (!isMongoConnected()) {
-      if (memoryUsers.has(username)) {
-        return res.status(409).json({ success: false, message: 'User already exists' });
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Username and password are required' });
       }
 
-      const user = {
-        _id: new mongoose.Types.ObjectId(),
-        username,
-        password: hash,
-        role
-      };
+      if (!['admin', 'officer', 'citizen'].includes(role)) {
+        return res.status(400).json({ success: false, message: 'Invalid role selected' });
+      }
 
-      memoryUsers.set(username, user);
-      persistFallbackUsers();
-      return res.json({ success: true, user: makeUserPayload(user) });
-    }
+      const hash = await bcrypt.hash(password, 10);
 
-    try {
+      if (!isMongoConnected()) {
+        if (memoryUsers.has(username)) {
+          return res.status(409).json({ success: false, message: 'User already exists' });
+        }
+
+        const user = {
+          _id: new mongoose.Types.ObjectId(),
+          username,
+          password: hash,
+          role
+        };
+
+        memoryUsers.set(username, user);
+        persistFallbackUsers();
+        return res.json({ success: true, user: makeUserPayload(user) });
+      }
+
       const user = await User.create({ username, password: hash, role });
       res.json({ success: true, user: makeUserPayload(user) });
     } catch (e) {
@@ -123,43 +123,48 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
 
   // Login
   app.post('/api/auth', async (req, res) => {
-    const username = String(req.body.username || '').trim();
-    const password = String(req.body.password || '');
-    const requestedRole = String(req.body.role || '').trim();
+    try {
+      const username = String(req.body.username || '').trim();
+      const password = String(req.body.password || '');
+      const requestedRole = String(req.body.role || '').trim();
 
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username and password are required' });
-    }
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Username and password are required' });
+      }
 
-    let user = null;
+      let user = null;
 
-    if (isMongoConnected()) {
-      try {
-        user = await User.findOne({ username });
-      } catch (e) {
-        if (!String(e?.message || '').toLowerCase().includes('buffering timed out')) {
-          throw e;
+      if (isMongoConnected()) {
+        try {
+          user = await User.findOne({ username });
+        } catch (e) {
+          if (!String(e?.message || '').toLowerCase().includes('buffering timed out')) {
+            throw e;
+          }
         }
       }
+
+      if (!user) {
+        user = memoryUsers.get(username) || null;
+      }
+
+      if (!user) return res.status(400).json({ success: false, message: 'Invalid credentials' });
+
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) return res.status(400).json({ success: false, message: 'Invalid credentials' });
+
+      const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1d' });
+      res.json({
+        success: true,
+        token,
+        role: user.role,
+        requestedRole: requestedRole || undefined,
+        message: requestedRole && requestedRole !== user.role ? `Logged in as ${user.role}` : undefined
+      });
+    } catch (error) {
+      console.error('[AUTH] Login failure:', error.message);
+      res.status(500).json({ success: false, message: 'Login failed' });
     }
-
-    if (!user) {
-      user = memoryUsers.get(username) || null;
-    }
-
-    if (!user) return res.status(400).json({ success: false, message: 'Invalid credentials' });
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ success: false, message: 'Invalid credentials' });
-
-    const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({
-      success: true,
-      token,
-      role: user.role,
-      requestedRole: requestedRole || undefined,
-      message: requestedRole && requestedRole !== user.role ? `Logged in as ${user.role}` : undefined
-    });
   });
 
   // Auth middleware

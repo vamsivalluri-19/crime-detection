@@ -261,50 +261,50 @@ function saveProfileFallback(userId, update) {
 }
 
 app.get('/api/profile', async (req, res) => {
-  if (!req.user) return res.status(401).json({ success: false });
   try {
+    if (!req.user) return res.status(401).json({ success: false });
     if (mongoose.connection.readyState === 1) {
       const profile = await Profile.findOne({ user: req.user.id });
       if (profile) {
         return res.json({ profile });
       }
     }
+    return res.json({ profile: getProfileFallback(req.user.id) });
   } catch (error) {
-    console.warn('[PROFILE] Falling back to in-memory profile store:', error.message);
+    console.warn('[PROFILE] GET failed, using fallback:', error.message);
+    return res.json({ profile: getProfileFallback(req.user?.id) });
   }
-
-  return res.json({ profile: getProfileFallback(req.user.id) });
 });
 
 app.post('/api/profile', upload.single('avatar'), async (req, res) => {
-  if (!req.user) return res.status(401).json({ success: false });
-  let notificationPreferences = req.body.notificationPreferences;
-  if (typeof notificationPreferences === 'string') {
-    try {
-      notificationPreferences = JSON.parse(notificationPreferences);
-    } catch (_) {
-      notificationPreferences = undefined;
-    }
-  }
-
-  const update = {
-    name: req.body.name,
-    email: req.body.email,
-    phone: req.body.phone,
-    lastUpdated: new Date()
-  };
-
-  if (notificationPreferences && typeof notificationPreferences === 'object') {
-    update.notificationPreferences = {
-      emailIncidents: Boolean(notificationPreferences.emailIncidents),
-      smsEmergencies: Boolean(notificationPreferences.smsEmergencies),
-      pushNotifications: Boolean(notificationPreferences.pushNotifications)
-    };
-  }
-
-  if (req.file) update.avatar = '/uploads/' + req.file.filename;
-
   try {
+    if (!req.user) return res.status(401).json({ success: false });
+    let notificationPreferences = req.body.notificationPreferences;
+    if (typeof notificationPreferences === 'string') {
+      try {
+        notificationPreferences = JSON.parse(notificationPreferences);
+      } catch (_) {
+        notificationPreferences = undefined;
+      }
+    }
+
+    const update = {
+      name: req.body.name,
+      email: req.body.email,
+      phone: req.body.phone,
+      lastUpdated: new Date()
+    };
+
+    if (notificationPreferences && typeof notificationPreferences === 'object') {
+      update.notificationPreferences = {
+        emailIncidents: Boolean(notificationPreferences.emailIncidents),
+        smsEmergencies: Boolean(notificationPreferences.smsEmergencies),
+        pushNotifications: Boolean(notificationPreferences.pushNotifications)
+      };
+    }
+
+    if (req.file) update.avatar = '/uploads/' + req.file.filename;
+
     if (mongoose.connection.readyState === 1) {
       const profile = await Profile.findOneAndUpdate(
         { user: req.user.id },
@@ -313,22 +313,22 @@ app.post('/api/profile', upload.single('avatar'), async (req, res) => {
       );
       return res.json({ profile });
     }
+    return res.json({ profile: saveProfileFallback(req.user.id, update) });
   } catch (error) {
-    console.warn('[PROFILE] Mongo update failed, using in-memory fallback:', error.message);
+    console.warn('[PROFILE] POST failed, using fallback:', error.message);
+    return res.json({ profile: saveProfileFallback(req.user?.id, { name: req.body.name, email: req.body.email, phone: req.body.phone, lastUpdated: new Date() }) });
   }
-
-  return res.json({ profile: saveProfileFallback(req.user.id, update) });
 });
 
 app.post('/api/profile/password', async (req, res) => {
-  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
-
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ success: false, message: 'Missing password fields' });
-  }
-
   try {
+    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Missing password fields' });
+    }
+
     if (mongoose.connection.readyState === 1) {
       const user = await User.findById(req.user.id);
       if (!user) {
@@ -345,55 +345,71 @@ app.post('/api/profile/password', async (req, res) => {
 
       return res.json({ success: true, message: 'Password updated' });
     }
+    
+    const fallbackUser = authModule.memoryUsers?.get(req.user.username) || null;
+    if (!fallbackUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const passwordMatches = await bcrypt.compare(currentPassword, fallbackUser.password);
+    if (!passwordMatches) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    fallbackUser.password = await bcrypt.hash(newPassword, 10);
+    authModule.memoryUsers.set(req.user.username, fallbackUser);
+    res.json({ success: true, message: 'Password updated' });
   } catch (error) {
-    console.warn('[PROFILE] Password update failed in Mongo, trying fallback:', error.message);
+    console.warn('[PROFILE] Password update failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Password update failed' });
   }
-
-  const fallbackUser = authModule.memoryUsers?.get(req.user.username) || null;
-  if (!fallbackUser) {
-    return res.status(404).json({ success: false, message: 'User not found' });
-  }
-
-  const passwordMatches = await bcrypt.compare(currentPassword, fallbackUser.password);
-  if (!passwordMatches) {
-    return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-  }
-
-  fallbackUser.password = await bcrypt.hash(newPassword, 10);
-  authModule.memoryUsers.set(req.user.username, fallbackUser);
-  res.json({ success: true, message: 'Password updated' });
 });
 
 // --- Incident Commenting & Status Updates ---
 app.get('/api/incidents/:id/comments', async (req, res) => {
-  const comments = await IncidentComment.find({ incidentId: req.params.id }).populate('user', 'username');
-  res.json({ comments });
+  try {
+    const comments = await IncidentComment.find({ incidentId: req.params.id }).populate('user', 'username');
+    res.json({ comments });
+  } catch (error) {
+    console.warn('[COMMENTS] GET failed:', error.message);
+    res.json({ comments: [] });
+  }
 });
 
 app.post('/api/incidents/:id/comments', async (req, res) => {
-  if (!req.user) return res.status(401).json({ success: false });
-  const comment = await IncidentComment.create({
-    incidentId: req.params.id,
-    user: req.user.id,
-    comment: req.body.comment,
-    status: req.body.status
-  });
-  res.json({ comment });
+  try {
+    if (!req.user) return res.status(401).json({ success: false });
+    const comment = await IncidentComment.create({
+      incidentId: req.params.id,
+      user: req.user.id,
+      comment: req.body.comment,
+      status: req.body.status
+    });
+    res.json({ comment });
+  } catch (error) {
+    console.warn('[COMMENTS] POST failed:', error.message);
+    res.status(500).json({ success: false, message: 'Unable to save comment' });
+  }
 });
 
 // --- Audit Logs ---
 app.get('/api/audit-logs', async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false });
-  if (mongoose.connection.readyState === 1) {
-    try {
-      const logs = await AuditLog.find().populate('user', 'username').sort({ createdAt: -1 }).limit(100);
-      return res.json({ logs });
-    } catch (error) {
-      // Fall back to in-memory audit entries when the database is not available.
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false });
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const logs = await AuditLog.find().populate('user', 'username').sort({ createdAt: -1 }).limit(100);
+        return res.json({ logs });
+      } catch (error) {
+        // Fall back to in-memory audit entries when the database is not available.
+      }
     }
-  }
 
-  res.json({ logs: auditEntries });
+    res.json({ logs: auditEntries });
+  } catch (error) {
+    console.warn('[AUDIT] GET failed:', error.message);
+    res.json({ logs: auditEntries });
+  }
 });
 
 // In-memory data for demo
@@ -593,45 +609,52 @@ app.get('/api/analytics', (req, res) => {
 
 // Reports
 app.get('/api/reports', (req, res) => {
-  res.json({ reports });
-});
+  try {
+    const { latitude, longitude, userId, username, citizenName, citizenPhone, locationText, reportId } = req.body || {};
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const reporterName = username || citizenName || 'Citizen';
 
-app.patch('/api/reports/:id/status', (req, res) => {
-  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
+    }
 
-  const reportId = String(req.params.id || '').trim();
-  const status = String(req.body.status || '').trim();
-  const notes = String(req.body.notes || '').trim();
-  if (!reportId || !status) {
-    return res.status(400).json({ success: false, message: 'Report id and status are required' });
+    const alert = {
+      id: `SOS-${Date.now()}`,
+      type: 'SOS Emergency',
+      location: locationText || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+      latitude: lat,
+      longitude: lng,
+      userId: userId || req.user?.id || 'anonymous',
+      reportedBy: reporterName,
+      citizenName: citizenName || reporterName,
+      citizenPhone: citizenPhone || '',
+      reportId: reportId || null,
+      time: new Date().toLocaleString()
+    };
+
+    alerts.unshift(alert);
+
+    try {
+      if (req.user && mongoose.connection.readyState === 1) {
+        const profile = await Profile.findOne({ user: req.user.id }).lean();
+        if (profile) {
+          alert.avatar = profile.avatar || null;
+          alert.email = profile.email || null;
+        }
+      }
+    } catch (_) {
+      // ignore profile lookup issues
+    }
+
+    recordAudit('sos', alert.location, reporterName);
+    emitAlert(alert);
+    io.emit('citizen-sos', alert);
+    res.json({ success: true, alert });
+  } catch (error) {
+    console.warn('[SOS] POST failed:', error.message);
+    res.status(500).json({ success: false, message: 'Unable to submit SOS alert' });
   }
-
-  const report = reports.find((item) => item.id === reportId);
-  if (!report) {
-    return res.status(404).json({ success: false, message: 'Report not found' });
-  }
-
-  report.status = status;
-  report.notes = notes;
-  report.updatedAt = new Date().toISOString();
-  recordAudit('report-status', `${reportId} -> ${status}`, req.user.username);
-
-  res.json({ success: true, report });
-});
-
-app.post('/api/report', upload.array('evidence'), (req, res) => {
-  const {
-    type,
-    location,
-    description,
-    citizenName,
-    citizenPhone,
-    citizenDetails,
-    reportLatitude,
-    reportLongitude
-  } = req.body;
-  const id = 'INC-' + Math.floor(Math.random() * 10000);
-  const lat = Number(reportLatitude);
   const lng = Number(reportLongitude);
   const reporterName = req.user?.username || citizenName || 'Citizen';
   const report = {
@@ -925,13 +948,11 @@ function startServer(port) {
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] Uncaught exception:', err.message);
   console.error(err.stack);
-  process.exit(1);
 });
 
 // Catch unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[FATAL] Unhandled rejection at:', promise, 'reason:', reason);
-  process.exit(1);
 });
 
 console.log('[STARTUP] Starting application...');
