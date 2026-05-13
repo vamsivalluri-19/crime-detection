@@ -209,9 +209,9 @@ let currentUser = null;
             }
         };
 
-        async function apiRequest(endpoint, options = {}) {
+        async function apiRequest(endpoint, options = {}, includeAuth = true) {
             const headers = options.headers || {};
-            if (authToken) {
+            if (includeAuth && authToken) {
                 headers.Authorization = `Bearer ${authToken}`;
             }
 
@@ -305,7 +305,7 @@ let currentUser = null;
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password, role })
-                });
+                }, false);
 
                 document.getElementById('registerErrorMsg').style.display = 'none';
                 document.getElementById('registerSuccessMsg').textContent = 'Registration successful! You can now log in.';
@@ -348,7 +348,7 @@ let currentUser = null;
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
-                });
+                }, false);
 
                 if (data.role && role !== data.role) {
                     throw new Error(`Account role is ${data.role}. Please choose the correct role.`);
@@ -1385,8 +1385,14 @@ let currentUser = null;
                         const data = await apiRequest('/api/sos', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ latitude, longitude })
-                        });
+                            body: JSON.stringify({
+                                latitude,
+                                longitude,
+                                username: currentUser,
+                                citizenName: document.getElementById('complaintCitizenName')?.value || currentUser,
+                                citizenPhone: document.getElementById('complaintCitizenPhone')?.value || ''
+                            })
+                        }, false);
 
                         if (data?.data) {
                             handleIncomingAlert(data.data, {

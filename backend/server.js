@@ -308,7 +308,7 @@ let reports = [
 
 // SOS alert (with WebSocket broadcast)
 app.post('/api/sos', async (req, res) => {
-  const { latitude, longitude } = req.body;
+  const { latitude, longitude, username, citizenName, citizenPhone } = req.body;
   const id = 'SOS-' + (Math.floor(Math.random() * 1000) + 100);
 
   const baseAlert = {
@@ -335,6 +335,10 @@ app.post('/api/sos', async (req, res) => {
     } catch (err) {
       // ignore profile lookup failures and continue
     }
+  } else {
+    sosEvent.username = username || undefined;
+    sosEvent.citizenName = citizenName || username || undefined;
+    sosEvent.citizenPhone = citizenPhone || undefined;
   }
 
   alerts.unshift(baseAlert);
