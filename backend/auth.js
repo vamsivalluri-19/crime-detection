@@ -174,3 +174,5 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
     }
   });
 };
+
+module.exports.memoryUsers = memoryUsers;

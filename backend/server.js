@@ -53,6 +53,8 @@ try {
   console.log('[STARTUP] Using fallback middleware, continuing startup...');
 }
 
+const authModule = require('./auth');
+
 // MongoDB connection: prefer MONGO_URI env var, fallback to local MongoDB for dev
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crimeai';
 
@@ -240,10 +242,38 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- User Profile Management ---
+const memoryProfiles = new Map();
+
+function getProfileFallback(userId) {
+  return memoryProfiles.get(String(userId)) || null;
+}
+
+function saveProfileFallback(userId, update) {
+  const existing = memoryProfiles.get(String(userId)) || { user: String(userId) };
+  const profile = {
+    ...existing,
+    ...update,
+    user: String(userId),
+    lastUpdated: new Date()
+  };
+  memoryProfiles.set(String(userId), profile);
+  return profile;
+}
+
 app.get('/api/profile', async (req, res) => {
   if (!req.user) return res.status(401).json({ success: false });
-  const profile = await Profile.findOne({ user: req.user.id });
-  res.json({ profile });
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const profile = await Profile.findOne({ user: req.user.id });
+      if (profile) {
+        return res.json({ profile });
+      }
+    }
+  } catch (error) {
+    console.warn('[PROFILE] Falling back to in-memory profile store:', error.message);
+  }
+
+  return res.json({ profile: getProfileFallback(req.user.id) });
 });
 
 app.post('/api/profile', upload.single('avatar'), async (req, res) => {
@@ -273,12 +303,21 @@ app.post('/api/profile', upload.single('avatar'), async (req, res) => {
   }
 
   if (req.file) update.avatar = '/uploads/' + req.file.filename;
-  const profile = await Profile.findOneAndUpdate(
-    { user: req.user.id },
-    { $set: update, $setOnInsert: { user: req.user.id } },
-    { upsert: true, new: true }
-  );
-  res.json({ profile });
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const profile = await Profile.findOneAndUpdate(
+        { user: req.user.id },
+        { $set: update, $setOnInsert: { user: req.user.id } },
+        { upsert: true, new: true }
+      );
+      return res.json({ profile });
+    }
+  } catch (error) {
+    console.warn('[PROFILE] Mongo update failed, using in-memory fallback:', error.message);
+  }
+
+  return res.json({ profile: saveProfileFallback(req.user.id, update) });
 });
 
 app.post('/api/profile/password', async (req, res) => {
@@ -289,19 +328,39 @@ app.post('/api/profile/password', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Missing password fields' });
   }
 
-  const user = await User.findById(req.user.id);
-  if (!user) {
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const passwordMatches = await bcrypt.compare(currentPassword, user.password);
+      if (!passwordMatches) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
+
+      user.password = await bcrypt.hash(newPassword, 10);
+      await user.save();
+
+      return res.json({ success: true, message: 'Password updated' });
+    }
+  } catch (error) {
+    console.warn('[PROFILE] Password update failed in Mongo, trying fallback:', error.message);
+  }
+
+  const fallbackUser = authModule.memoryUsers?.get(req.user.username) || null;
+  if (!fallbackUser) {
     return res.status(404).json({ success: false, message: 'User not found' });
   }
 
-  const passwordMatches = await bcrypt.compare(currentPassword, user.password);
+  const passwordMatches = await bcrypt.compare(currentPassword, fallbackUser.password);
   if (!passwordMatches) {
     return res.status(400).json({ success: false, message: 'Current password is incorrect' });
   }
 
-  user.password = await bcrypt.hash(newPassword, 10);
-  await user.save();
-
+  fallbackUser.password = await bcrypt.hash(newPassword, 10);
+  authModule.memoryUsers.set(req.user.username, fallbackUser);
   res.json({ success: true, message: 'Password updated' });
 });
 
@@ -824,6 +883,14 @@ app.delete('/api/contacts', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
+  const origin = req?.headers?.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   console.error('Error:', err.message, err.stack);
   res.status(500).json({ 
     success: false, 

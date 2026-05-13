@@ -476,7 +476,9 @@ let currentUser = null;
 
                 speechSocket = socketIo(API_BASE, {
                     auth: { token: authToken },
-                    transports: ['websocket', 'polling'],
+                    transports: window.location.hostname && !['localhost', '127.0.0.1'].includes(window.location.hostname)
+                        ? ['polling']
+                        : ['websocket', 'polling'],
                     reconnection: true,
                     reconnectionDelay: 1000,
                     reconnectionDelayMax: 5000,
