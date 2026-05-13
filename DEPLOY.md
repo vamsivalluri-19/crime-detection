@@ -45,33 +45,23 @@ Important: Socket.IO requires a live WebSocket connection to the backend. When u
 ## 3) Deploy Frontend on Vercel
 
 1. Sign in to https://vercel.com and create a new project. Choose "Import from Git" and select the same repo.
-2. Configure the root to deploy the static `frontend` folder. In the Vercel project settings:
-   - Set `Build & Output Settings` so that `framework` is `Other`, `Build Command` is empty, and `Output Directory` is `/frontend` (or simply make `index.html` at root of project for static deployments).
-3. Edit `vercel.json` in the repository: replace `RENDER_SERVICE.onrender.com` with your actual Render backend host (e.g. `my-backend.onrender.com`) if you want Vercel to proxy `/api` to Render. **Note:** Vercel static routing proxies do not reliably support WebSocket upgrades; for real-time sockets, configure the frontend to connect to the Render URL directly.
+2. Keep the repo root as the project root.
+3. Set the Vercel build settings to use the generated static output:
+   - Build Command: `npm run vercel-build`
+   - Output Directory: `public`
+   - Framework Preset: `Other`
+4. Add a Vercel environment variable named `API_BASE` with your Render backend URL as the value, for example `https://my-backend.onrender.com`.
+5. Deploy the project. The build step writes `public/env.js` from `API_BASE`, and the browser loads that file before `app.js`.
+6. Do not use `window.__API_BASE__` as the Vercel environment variable key. Vercel only accepts simple names like `API_BASE`.
+7. Do not rely on a Vercel `/api` proxy for Socket.IO. The frontend should connect directly to the Render service URL for both API calls and WebSockets.
 
-Alternative (recommended): Configure the frontend to call the API and sockets directly at the Render URL.
-
-### To configure frontend at build-time (Vercel env vars)
-- In the Vercel project settings > Environment Variables, create `API_BASE` with value e.g. `https://my-backend.onrender.com`.
-- In `frontend/index.html`, we included logic to read `window.__API_BASE__` if injected. Since this is static HTML, the easiest approach is to add a small file `frontend/env.js` at build time that sets `window.__API_BASE__ = 'https://my-backend.onrender.com'`.
-
-Example `env.js` (create manually or via Vercel build hook):
-```js
-window.__API_BASE__ = 'https://my-backend.onrender.com';
-```
-Include it from `index.html` before `app.js`:
-```html
-<script src="env.js"></script>
-<script src="app.js"></script>
-```
-
-This avoids needing server-side templating on Vercel.
+If you prefer to keep the frontend API base out of the repo, replace `frontend/env.js` with a deploy-time generated file that sets `window.__API_BASE__` to your Render URL.
 
 ---
 
 ## 4) Finalize config and test
 
-- Ensure `vercel.json` is updated if you want Vercel to proxy `/api` paths. Replace the placeholder `RENDER_SERVICE.onrender.com` with your actual backend host.
+- Ensure `API_BASE` is set in Vercel to your actual Render backend host.
 - On Render, verify backend `/api/alerts` returns data.
 - On Vercel, open the deployed frontend URL and confirm it can call the API and connect to sockets.
 

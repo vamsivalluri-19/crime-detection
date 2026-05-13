@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
-    "vercel-build": "echo 'No build step; frontend is static'"
+    "vercel-build": "node build-vercel.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

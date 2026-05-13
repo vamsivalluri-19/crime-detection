@@ -128,7 +128,12 @@ let currentUser = null;
                 }
             } catch (_) {}
 
-            if (FRONTEND_ORIGIN && await probeApiBase(FRONTEND_ORIGIN)) {
+            const isLocalFrontendOrigin = typeof window !== 'undefined' && (
+                window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1'
+            );
+
+            if (isLocalFrontendOrigin && FRONTEND_ORIGIN && await probeApiBase(FRONTEND_ORIGIN)) {
                 API_BASE = FRONTEND_ORIGIN;
                 return API_BASE;
             }

@@ -29,16 +29,11 @@ Overview
   - `CLOUDINARY_URL` = if using Cloudinary
 - Deploy: Render will build and start your service. Note the service URL (e.g., `https://your-app.onrender.com`).
 
-4) Update `vercel.json`
-- The repository now contains `vercel.json` with a placeholder route that forwards `/api/*` to Render:
+4) Configure the frontend API base
+- The repo includes `frontend/env.js` as the runtime configuration file loaded before `app.js`.
+- Replace the placeholder URL in `frontend/env.js` with your actual Render service URL, for example:
 
-  {
-    "routes": [
-      { "src": "/api/(.*)", "dest": "https://RENDER_SERVICE.onrender.com/api/$1" }
-    ]
-  }
-
-- After Render deploy finishes, replace `https://RENDER_SERVICE.onrender.com` with your actual Render service URL in `vercel.json` (or update via Vercel dashboard redirects).
+  window.__API_BASE__ = 'https://your-app.onrender.com';
 
 5) Deploy frontend to Vercel
 - Install Vercel CLI and login:
@@ -46,14 +41,14 @@ Overview
 npm i -g vercel
 vercel login
 ```
-- From the repo root (where `index.html` is), run:
+- From the repo root, run:
 ```powershell
 vercel
 # follow prompts and link the project
 vercel --prod
 ```
 - Alternatively, use the Vercel web UI and import your GitHub repo.
-- If `vercel.json` has the correct Render URL for `/api/*`, requests from frontend to `/api/...` will be proxied to your backend.
+- The frontend should call the Render URL directly for API requests and Socket.IO.
 
 6) Environment & CORS
 - `server.js` already enables `cors()` for all origins. Confirm CORS if you restrict origins.
@@ -78,7 +73,7 @@ curl -X GET https://your-app.onrender.com/api/alerts
 10) Quick checklist
 - [ ] Create MongoDB Atlas and get `MONGO_URI`
 - [ ] Deploy backend to Render and set env vars (`MONGO_URI`, `JWT_SECRET`)
-- [ ] Replace `RENDER_SERVICE` placeholder in `vercel.json` with your Render URL
+- [ ] Replace the placeholder URL in `frontend/env.js` with your Render URL
 - [ ] Deploy frontend to Vercel
 - [ ] Test end-to-end
 
