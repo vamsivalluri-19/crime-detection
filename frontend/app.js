@@ -396,10 +396,17 @@ let currentUser = null;
             loadContacts();
             loadReports();
             loadProfile();
+            renderEvidenceVault();
             refreshAnalytics();
             applyAlertSettingsToUI();
             configureCitizenComplaintForm(role);
             connectSpeechSocket();
+
+            if (role === 'admin') {
+                loadAdminCameras();
+                fetchAuditLogs();
+                startDetection();
+            }
         }
 
         function logout() {
@@ -1743,7 +1750,7 @@ let currentUser = null;
                 const data = await apiRequest('/api/report', {
                     method: 'POST',
                     body: formData
-                }, false);
+                });
 
                 if (submitMsg) {
                     submitMsg.style.display = 'block';
@@ -1845,14 +1852,45 @@ let currentUser = null;
             const statusSelect = document.getElementById('newStatusSelect');
             const notes = document.getElementById('updateStatusNotes');
             const msg = document.getElementById('updateStatusMsg');
+            const incidentId = String(idField?.textContent || '').trim();
 
-            if (msg) {
-                msg.style.display = 'block';
-                msg.className = 'success-msg';
-                msg.textContent = `Updated ${idField?.textContent || 'incident'} to ${statusSelect?.value || 'Open'}.`;
+            if (!incidentId) {
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.className = 'error-msg';
+                    msg.textContent = 'Select an incident before updating the status.';
+                }
+                return;
             }
 
-            showNotification('Status updated', `Incident ${idField?.textContent || ''} set to ${statusSelect?.value || 'Open'}.`);
+            try {
+                await apiRequest(`/api/reports/${encodeURIComponent(incidentId)}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: statusSelect?.value || 'Open',
+                        notes: notes?.value || ''
+                    })
+                });
+
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.className = 'success-msg';
+                    msg.textContent = `Updated ${incidentId} to ${statusSelect?.value || 'Open'}.`;
+                }
+
+                showNotification('Status updated', `Incident ${incidentId} set to ${statusSelect?.value || 'Open'}.`);
+                await loadReports();
+            } catch (error) {
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.className = 'error-msg';
+                    msg.textContent = error.message || 'Unable to update incident status.';
+                }
+                showNotification('Status update failed', error.message || 'Unable to update incident status.');
+                return;
+            }
+
             const modal = document.getElementById('updateStatusModal');
             if (modal) modal.classList.remove('active');
 
@@ -2025,52 +2063,153 @@ let currentUser = null;
 
         async function submitEvidenceUpload(event) {
             event.preventDefault();
+            const form = event.target;
             const msg = document.getElementById('evUploadMsg');
-            if (msg) {
-                msg.style.display = 'block';
-                msg.className = 'success-msg';
-                msg.textContent = 'Evidence upload saved locally in this build.';
+            const formData = new FormData();
+            formData.append('caseId', form.evCaseId?.value?.trim() || 'Unassigned');
+            formData.append('evidenceType', form.evUploadType?.value?.trim() || 'other');
+            formData.append('description', form.evUploadDesc?.value?.trim() || '');
+
+            const files = form.evidence?.files || [];
+            for (const file of files) {
+                formData.append('evidence', file);
             }
-            const modal = document.getElementById('uploadEvidenceModal');
-            if (modal) modal.classList.remove('active');
+
+            try {
+                const data = await apiRequest('/api/evidence/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.className = 'success-msg';
+                    msg.textContent = data?.evidence?.length ? `Uploaded ${data.evidence.length} evidence item(s).` : 'Evidence uploaded successfully.';
+                }
+
+                const modal = document.getElementById('uploadEvidenceModal');
+                if (modal) modal.classList.remove('active');
+                form.reset();
+                await renderEvidenceVault();
+                showNotification('Evidence uploaded', 'Evidence was saved to the vault.');
+            } catch (error) {
+                if (msg) {
+                    msg.style.display = 'block';
+                    msg.className = 'error-msg';
+                    msg.textContent = error.message || 'Unable to upload evidence.';
+                }
+                showNotification('Evidence upload failed', error.message || 'Unable to upload evidence.');
+            }
         }
 
-        function renderEvidenceVault() {
+        async function renderEvidenceVault() {
             const grid = document.getElementById('evidenceVaultGrid');
             if (!grid) return;
 
-            grid.innerHTML = `
-                <div class="detection-card">
-                    <div class="detection-image">📸</div>
-                    <div class="detection-info">
-                        <div class="detection-type weapon">Photo Evidence</div>
-                        <div style="color:var(--text-muted);font-size:14px;">Case: INC-2024-001</div>
+            try {
+                const data = await apiRequest('/api/evidence', { method: 'GET' }, false);
+                const evidence = Array.isArray(data.evidence) ? data.evidence : [];
+
+                grid.innerHTML = evidence.length ? evidence.map((item) => `
+                    <div class="detection-card">
+                        <div class="detection-image">${item.mimeType?.startsWith('image/') ? '🖼️' : '📎'}</div>
+                        <div class="detection-info">
+                            <div class="detection-type weapon">${item.evidenceType || 'Evidence'}</div>
+                            <div style="color:var(--text-muted);font-size:14px;">Case: ${item.caseId || 'Unassigned'}</div>
+                            <div style="color:var(--text-muted);font-size:14px;">${item.fileName || 'Unnamed file'}</div>
+                            <div style="color:var(--text-muted);font-size:12px;">Uploaded by ${item.uploader || 'Citizen'} • ${item.status || 'Verified'}</div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `).join('') : `
+                    <div class="detection-card">
+                        <div class="detection-image">📁</div>
+                        <div class="detection-info">
+                            <div class="detection-type weapon">No evidence yet</div>
+                            <div style="color:var(--text-muted);font-size:14px;">Uploaded files will appear here.</div>
+                        </div>
+                    </div>
+                `;
+
+                filterEvidenceVault();
+            } catch (error) {
+                grid.innerHTML = `
+                    <div class="detection-card">
+                        <div class="detection-image">⚠️</div>
+                        <div class="detection-info">
+                            <div class="detection-type weapon">Evidence unavailable</div>
+                            <div style="color:var(--text-muted);font-size:14px;">${error.message || 'Unable to load evidence.'}</div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         async function fetchAuditLogs() {
+            const tableBody = document.getElementById('auditLogTableBody');
+            if (!tableBody) return;
+
             try {
-                await apiRequest('/api/audit-logs', { method: 'GET' });
+                const data = await apiRequest('/api/audit-logs', { method: 'GET' });
+                const logs = Array.isArray(data.logs) ? data.logs : [];
+
+                tableBody.innerHTML = logs.length ? logs.map((log) => `
+                    <tr>
+                        <td>${log.id || 'N/A'}</td>
+                        <td>${log.user || 'system'}</td>
+                        <td>${log.action || 'Log entry'}</td>
+                        <td>${log.details || ''}</td>
+                        <td>${log.ipAddress || 'render-runtime'}</td>
+                        <td>${log.date || ''}</td>
+                    </tr>
+                `).join('') : `
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">No audit entries yet.</td></tr>
+                `;
+
                 showNotification('Audit log', 'Audit logs loaded successfully.');
             } catch (error) {
+                tableBody.innerHTML = `
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:18px;">${error.message || 'Unable to load audit logs.'}</td></tr>
+                `;
                 showNotification('Audit log unavailable', error.message || 'Unable to load audit logs.');
             }
         }
 
-        function startDetection() {
+        function renderDetectionHistory(detections) {
+            const history = document.getElementById('adminDetectionHistory');
+            if (!history) return;
+
+            history.innerHTML = detections.length ? detections.map((detection) => `
+                <div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <div style="display:flex; justify-content:space-between; gap:10px;">
+                        <strong>${detection.id || detection.type || 'Detection'}</strong>
+                        <span>${Number.isFinite(Number(detection.confidence)) ? `${Number(detection.confidence).toFixed(1)}%` : ''}</span>
+                    </div>
+                    <div>${detection.type || 'Event'} • ${detection.location || 'Unknown location'}</div>
+                    <div>${detection.license ? `License: ${detection.license} • ` : ''}${detection.time || ''}</div>
+                </div>
+            `).join('') : '<div style="color:var(--text-muted); text-align:center; padding:20px;">No detection history available.</div>';
+        }
+
+        async function startDetection() {
             const statusText = document.getElementById('aiStatusText');
             const statusDot = document.getElementById('aiStatusDot');
             const logPanel = document.getElementById('detectionLogPanel');
             const stopBtn = document.getElementById('aiStopBtn');
             const startBtn = document.getElementById('aiStartBtn');
-            if (statusText) statusText.textContent = 'Running';
-            if (statusDot) statusDot.style.background = '#22c55e';
-            if (logPanel) logPanel.style.display = '';
-            if (stopBtn) stopBtn.disabled = false;
-            if (startBtn) startBtn.disabled = true;
-            showNotification('Detection started', 'AI detection is now running.');
+            try {
+                const data = await apiRequest('/api/ai-detections', { method: 'GET' }, false);
+                const detections = Array.isArray(data.detections) ? data.detections : [];
+
+                renderDetectionHistory(detections);
+                if (statusText) statusText.textContent = 'Running';
+                if (statusDot) statusDot.style.background = '#22c55e';
+                if (logPanel) logPanel.style.display = '';
+                if (stopBtn) stopBtn.disabled = false;
+                if (startBtn) startBtn.disabled = true;
+                showNotification('Detection started', 'AI detection is now running.');
+            } catch (error) {
+                showNotification('Detection unavailable', error.message || 'Unable to load AI detections.');
+            }
         }
 
         function stopDetection() {
@@ -2086,7 +2225,27 @@ let currentUser = null;
         }
 
         function exportDetectionLog() {
-            showNotification('Export ready', 'Detection log export is not connected in this build.');
+            const history = document.getElementById('adminDetectionHistory');
+            if (!history) {
+                showNotification('Export unavailable', 'No detection history panel found.');
+                return;
+            }
+
+            const rows = Array.from(history.querySelectorAll('div')).map((row) => row.textContent.trim()).filter(Boolean);
+            if (!rows.length) {
+                showNotification('Export unavailable', 'No detection history to export.');
+                return;
+            }
+
+            const csv = ['entry', ...rows.map((row) => `"${row.replace(/"/g, '""')}"`)].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'detection-history.csv';
+            link.click();
+            URL.revokeObjectURL(url);
+            showNotification('Export ready', 'Detection log export downloaded.');
         }
 
         function dispatchUnit(id, type, location) {
@@ -2101,13 +2260,148 @@ let currentUser = null;
             showNotification('Intercept', `Vehicle ${plate} at ${location} is being intercepted.`);
         }
 
-        function adminAddCamera() { showNotification('Camera', 'Add camera flow is not connected in this build.'); }
-        function adminRefreshCameras() { showNotification('Camera', 'Camera list refreshed.'); }
-        function adminSaveModelConfig() { showNotification('Model', 'Model config saved.'); }
-        function adminResetModel() { showNotification('Model', 'Model reset to defaults.'); }
+        function renderAdminCameras(cameras) {
+            const body = document.getElementById('adminCameraTableBody');
+            if (!body) return;
+
+            body.innerHTML = cameras.length ? cameras.map((camera) => `
+                <tr>
+                    <td>${camera.id || 'N/A'}</td>
+                    <td>${camera.location || 'Unknown'}</td>
+                    <td><span class="badge badge-${String(camera.status || 'Online').toLowerCase().includes('online') ? 'success' : String(camera.status || '').toLowerCase().includes('maint') ? 'warning' : 'danger'}">${camera.status || 'Online'}</span></td>
+                    <td>${camera.resolution || '1080p'}</td>
+                    <td>${camera.mode || 'Monitoring'}</td>
+                    <td>${camera.lastPing || ''}</td>
+                    <td><button class="btn btn-primary btn-small" onclick="adminSaveModelConfig()">Sync</button></td>
+                </tr>
+            `).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">No cameras configured.</td></tr>';
+        }
+
+        async function loadAdminCameras() {
+            const body = document.getElementById('adminCameraTableBody');
+            const modelSelect = document.getElementById('adminModelSelect');
+            const fpsSelect = document.getElementById('adminFpsSelect');
+            const alertMode = document.getElementById('adminAlertMode');
+            const autoDispatch = document.getElementById('adminAutoDispatch');
+
+            try {
+                const [cameraData, modelData] = await Promise.all([
+                    apiRequest('/api/admin/cameras', { method: 'GET' }),
+                    apiRequest('/api/admin/model-config', { method: 'GET' })
+                ]);
+
+                renderAdminCameras(Array.isArray(cameraData.cameras) ? cameraData.cameras : []);
+
+                const config = modelData.modelConfig || {};
+                if (modelSelect && config.activeModel) modelSelect.value = config.activeModel;
+                if (fpsSelect && config.frameRate) fpsSelect.value = config.frameRate;
+                if (alertMode && config.alertMode) alertMode.value = config.alertMode;
+                if (autoDispatch) autoDispatch.checked = Boolean(config.autoDispatch);
+
+                [['confWeaponVal', config.weaponThreshold], ['confViolenceVal', config.violenceThreshold], ['confSuspVal', config.suspiciousThreshold], ['confVehicleVal', config.vehicleThreshold]].forEach(([id, value]) => {
+                    const node = document.getElementById(id);
+                    if (node && Number.isFinite(Number(value))) {
+                        node.textContent = `${Number(value)}%`;
+                    }
+                });
+
+                if (body) body.dataset.loaded = 'true';
+            } catch (error) {
+                if (body) {
+                    body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">${error.message || 'Unable to load cameras.'}</td></tr>`;
+                }
+                showNotification('Camera load failed', error.message || 'Unable to load admin cameras.');
+            }
+        }
+
+        async function adminAddCamera() {
+            const location = window.prompt('Enter camera location', 'New camera location');
+            if (!location) return;
+
+            try {
+                await apiRequest('/api/admin/cameras', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location,
+                        status: 'Online',
+                        resolution: '1080p',
+                        mode: 'General Monitoring'
+                    })
+                });
+
+                await loadAdminCameras();
+                showNotification('Camera added', `${location} is now in the camera list.`);
+            } catch (error) {
+                showNotification('Camera error', error.message || 'Unable to add camera.');
+            }
+        }
+
+        async function adminRefreshCameras() {
+            await loadAdminCameras();
+            showNotification('Camera list refreshed', 'Camera and model configuration reloaded.');
+        }
+
+        async function adminSaveModelConfig() {
+            const weapon = document.getElementById('confWeaponVal');
+            const violence = document.getElementById('confViolenceVal');
+            const suspicious = document.getElementById('confSuspVal');
+            const vehicle = document.getElementById('confVehicleVal');
+            const modelSelect = document.getElementById('adminModelSelect');
+            const fpsSelect = document.getElementById('adminFpsSelect');
+            const alertMode = document.getElementById('adminAlertMode');
+            const autoDispatch = document.getElementById('adminAutoDispatch');
+
+            try {
+                await apiRequest('/api/admin/model-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        weaponThreshold: Number(String(weapon?.textContent || '85').replace('%', '')),
+                        violenceThreshold: Number(String(violence?.textContent || '80').replace('%', '')),
+                        suspiciousThreshold: Number(String(suspicious?.textContent || '70').replace('%', '')),
+                        vehicleThreshold: Number(String(vehicle?.textContent || '90').replace('%', '')),
+                        activeModel: modelSelect?.value || 'YOLOv8 (Current)',
+                        frameRate: fpsSelect?.value || '15 FPS - Balanced',
+                        alertMode: alertMode?.value || 'Filtered - Above threshold only',
+                        autoDispatch: Boolean(autoDispatch?.checked)
+                    })
+                });
+
+                showNotification('Model saved', 'Model configuration synced to the backend.');
+            } catch (error) {
+                showNotification('Model save failed', error.message || 'Unable to save model config.');
+            }
+        }
+
+        async function adminResetModel() {
+            try {
+                await apiRequest('/api/admin/model-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        weaponThreshold: 85,
+                        violenceThreshold: 80,
+                        suspiciousThreshold: 70,
+                        vehicleThreshold: 90,
+                        activeModel: 'YOLOv8 (Current)',
+                        frameRate: '15 FPS - Balanced',
+                        alertMode: 'Filtered - Above threshold only',
+                        autoDispatch: true
+                    })
+                });
+
+                await loadAdminCameras();
+                showNotification('Model reset', 'Model configuration restored to defaults.');
+            } catch (error) {
+                showNotification('Reset failed', error.message || 'Unable to reset model config.');
+            }
+        }
+
         function adminClearHistory() {
             const history = document.getElementById('adminDetectionHistory');
             if (history) history.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:20px;">History cleared.</div>';
+            showNotification('History cleared', 'Detection history view has been cleared.');
         }
 
         function runNLPAnalysis() {
@@ -2169,5 +2463,18 @@ let currentUser = null;
                 <div style="color: var(--text-muted); font-size: 14px;">\n                    <div>📍 New deployment</div>\n                    <div>👮 Officers: 2</div>\n                    <div>⏱️ Response: 4.0 min</div>\n                </div>
             `;
             units.prepend(card);
+
+            apiRequest('/api/patrol-units', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: `P-${Math.floor(100 + Math.random() * 900)}`,
+                    status: 'Active',
+                    location: 'New deployment',
+                    officers: 2,
+                    responseTime: '4.0 min'
+                })
+            }).catch(() => {});
+
             showNotification('Unit deployed', 'A patrol unit has been added to the dashboard.');
         }

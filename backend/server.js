@@ -276,8 +276,16 @@ app.post('/api/incidents/:id/comments', async (req, res) => {
 // --- Audit Logs ---
 app.get('/api/audit-logs', async (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false });
-  const logs = await AuditLog.find().populate('user', 'username').sort({ createdAt: -1 }).limit(100);
-  res.json({ logs });
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const logs = await AuditLog.find().populate('user', 'username').sort({ createdAt: -1 }).limit(100);
+      return res.json({ logs });
+    } catch (error) {
+      // Fall back to in-memory audit entries when the database is not available.
+    }
+  }
+
+  res.json({ logs: auditEntries });
 });
 
 // In-memory data for demo
@@ -305,6 +313,43 @@ let reports = [
   { id: 'INC-1045', type: 'Suspicious Activity', location: 'Marine Drive', status: 'Under Review', date: 'Mar 16, 2026' },
   { id: 'INC-1044', type: 'Vehicle Theft', location: 'Colaba', status: 'Open', date: 'Mar 15, 2026' }
 ];
+
+let evidenceVault = [];
+
+let adminCameras = [
+  { id: 'CAM-001', location: 'Bandra Station Platform 2', status: 'Online', resolution: '1080p', mode: 'Weapon Detection', lastPing: 'Just now' },
+  { id: 'CAM-002', location: 'Marine Drive Junction', status: 'Online', resolution: '4K', mode: 'Crowd Analysis', lastPing: '2 minutes ago' },
+  { id: 'CAM-003', location: 'Gateway of India', status: 'Maintenance', resolution: '1080p', mode: 'Violence Detection', lastPing: '10 minutes ago' }
+];
+
+let modelConfig = {
+  weaponThreshold: 85,
+  violenceThreshold: 80,
+  suspiciousThreshold: 70,
+  vehicleThreshold: 90,
+  activeModel: 'YOLOv8 (Current)',
+  frameRate: '15 FPS - Balanced',
+  alertMode: 'Filtered - Above threshold only',
+  autoDispatch: true
+};
+
+let patrolUnitsStore = patrolUnits.map((unit) => ({ ...unit }));
+let auditEntries = [];
+
+function recordAudit(action, details, user = 'system') {
+  auditEntries.unshift({
+    id: `AUD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    user,
+    action,
+    details,
+    ipAddress: 'render-runtime',
+    date: new Date().toLocaleString()
+  });
+
+  if (auditEntries.length > 100) {
+    auditEntries.length = 100;
+  }
+}
 
 // SOS alert (with WebSocket broadcast)
 app.post('/api/sos', async (req, res) => {
@@ -395,7 +440,7 @@ app.post('/api/patrol-locations', (req, res) => {
 
 // Patrol units
 app.get('/api/patrol-units', (req, res) => {
-  res.json({ units: patrolUnits });
+  res.json({ patrolUnits: patrolUnitsStore });
 });
 
 // AI Detection feed
@@ -443,6 +488,29 @@ app.get('/api/reports', (req, res) => {
   res.json({ reports });
 });
 
+app.patch('/api/reports/:id/status', (req, res) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const reportId = String(req.params.id || '').trim();
+  const status = String(req.body.status || '').trim();
+  const notes = String(req.body.notes || '').trim();
+  if (!reportId || !status) {
+    return res.status(400).json({ success: false, message: 'Report id and status are required' });
+  }
+
+  const report = reports.find((item) => item.id === reportId);
+  if (!report) {
+    return res.status(404).json({ success: false, message: 'Report not found' });
+  }
+
+  report.status = status;
+  report.notes = notes;
+  report.updatedAt = new Date().toISOString();
+  recordAudit('report-status', `${reportId} -> ${status}`, req.user.username);
+
+  res.json({ success: true, report });
+});
+
 app.post('/api/report', upload.array('evidence'), (req, res) => {
   const {
     type,
@@ -475,6 +543,7 @@ app.post('/api/report', upload.array('evidence'), (req, res) => {
     date: new Date().toLocaleDateString()
   };
   reports.unshift(report);
+  recordAudit('report-create', `${id} ${type || 'Incident'} at ${location || 'Location unavailable'}`, reporterName);
 
   emitAlert({
     id: `CP-${Date.now()}`,
@@ -515,6 +584,160 @@ app.post('/api/report', upload.array('evidence'), (req, res) => {
   }
 
   res.json({ success: true, message: 'Report submitted', reportId: id });
+});
+
+app.get('/api/evidence', (req, res) => {
+  res.json({ evidence: evidenceVault });
+});
+
+app.post('/api/evidence/upload', upload.array('evidence'), (req, res) => {
+  const caseId = String(req.body.caseId || req.body.evCaseId || '').trim();
+  const evidenceType = String(req.body.evidenceType || req.body.evUploadType || req.body.type || 'other').trim() || 'other';
+  const description = String(req.body.description || req.body.evUploadDesc || '').trim();
+  const uploader = req.user?.username || String(req.body.uploader || req.body.username || 'Citizen').trim() || 'Citizen';
+
+  const files = Array.isArray(req.files) ? req.files : [];
+  const uploaded = files.map((file) => ({
+    id: `EVD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    caseId: caseId || 'Unassigned',
+    evidenceType,
+    description,
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+    filePath: '/uploads/' + file.filename,
+    status: 'Verified',
+    uploader,
+    createdAt: new Date().toISOString()
+  }));
+
+  if (!uploaded.length) {
+    return res.status(400).json({ success: false, message: 'No evidence files uploaded' });
+  }
+
+  evidenceVault.unshift(...uploaded);
+  recordAudit('evidence-upload', `${uploaded.length} file(s) for ${caseId || 'Unassigned'}`, uploader);
+
+  res.json({ success: true, evidence: uploaded });
+});
+
+app.delete('/api/evidence/:id', (req, res) => {
+  const evidenceId = String(req.params.id || '').trim();
+  const index = evidenceVault.findIndex((item) => item.id === evidenceId);
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: 'Evidence not found' });
+  }
+
+  evidenceVault.splice(index, 1);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/cameras', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+  res.json({ cameras: adminCameras });
+});
+
+app.post('/api/admin/cameras', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+
+  const camera = {
+    id: `CAM-${String(adminCameras.length + 1).padStart(3, '0')}`,
+    location: String(req.body.location || 'Unknown location').trim(),
+    status: String(req.body.status || 'Online').trim(),
+    resolution: String(req.body.resolution || '1080p').trim(),
+    mode: String(req.body.mode || 'General Monitoring').trim(),
+    lastPing: 'Just now'
+  };
+
+  adminCameras.unshift(camera);
+  recordAudit('camera-add', camera.location, req.user.username);
+  res.json({ success: true, camera });
+});
+
+app.patch('/api/admin/cameras/:id', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+
+  const camera = adminCameras.find((item) => item.id === req.params.id);
+  if (!camera) return res.status(404).json({ success: false, message: 'Camera not found' });
+
+  camera.location = String(req.body.location || camera.location).trim();
+  camera.status = String(req.body.status || camera.status).trim();
+  camera.resolution = String(req.body.resolution || camera.resolution).trim();
+  camera.mode = String(req.body.mode || camera.mode).trim();
+  camera.lastPing = 'Just now';
+  recordAudit('camera-update', camera.id, req.user.username);
+  res.json({ success: true, camera });
+});
+
+app.delete('/api/admin/cameras/:id', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+
+  const index = adminCameras.findIndex((item) => item.id === req.params.id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Camera not found' });
+
+  const removed = adminCameras.splice(index, 1)[0];
+  recordAudit('camera-remove', removed.id, req.user.username);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/model-config', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+  res.json({ modelConfig });
+});
+
+app.post('/api/admin/model-config', (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Forbidden' });
+
+  modelConfig = {
+    ...modelConfig,
+    weaponThreshold: Number(req.body.weaponThreshold || modelConfig.weaponThreshold),
+    violenceThreshold: Number(req.body.violenceThreshold || modelConfig.violenceThreshold),
+    suspiciousThreshold: Number(req.body.suspiciousThreshold || modelConfig.suspiciousThreshold),
+    vehicleThreshold: Number(req.body.vehicleThreshold || modelConfig.vehicleThreshold),
+    activeModel: String(req.body.activeModel || modelConfig.activeModel),
+    frameRate: String(req.body.frameRate || modelConfig.frameRate),
+    alertMode: String(req.body.alertMode || modelConfig.alertMode),
+    autoDispatch: Boolean(req.body.autoDispatch)
+  };
+
+  recordAudit('model-config', 'Model configuration updated', req.user.username);
+  res.json({ success: true, modelConfig });
+});
+
+app.get('/api/dashboard/summary', (req, res) => {
+  res.json({
+    alerts,
+    reports,
+    contacts,
+    patrolUnits: patrolUnitsStore,
+    evidence: evidenceVault,
+    cameras: adminCameras,
+    modelConfig
+  });
+});
+
+app.post('/api/patrol-units', (req, res) => {
+  const unit = {
+    id: String(req.body.id || `P-${Math.floor(100 + Math.random() * 900)}`),
+    status: String(req.body.status || 'Active'),
+    location: String(req.body.location || 'Unknown location'),
+    officers: Number(req.body.officers || 2),
+    responseTime: String(req.body.responseTime || '4.0 min')
+  };
+
+  patrolUnitsStore.unshift(unit);
+  res.json({ success: true, unit });
+});
+
+app.patch('/api/patrol-units/:id', (req, res) => {
+  const unit = patrolUnitsStore.find((item) => item.id === req.params.id);
+  if (!unit) return res.status(404).json({ success: false, message: 'Unit not found' });
+
+  unit.status = String(req.body.status || unit.status);
+  unit.location = String(req.body.location || unit.location);
+  unit.officers = Number(req.body.officers || unit.officers);
+  unit.responseTime = String(req.body.responseTime || unit.responseTime);
+  res.json({ success: true, unit });
 });
 
 // Alerts
