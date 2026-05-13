@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
+    "test-backend": "node test-backend-startup.js",
     "vercel-build": "node build-vercel.js"
   },
   "dependencies": {
