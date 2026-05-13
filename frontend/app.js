@@ -29,6 +29,7 @@ let currentUser = null;
             volumePercent: 55,
             pulseCycles: 3
         };
+        const PRODUCTION_API_BASE = 'https://crime-detection-ii5r.onrender.com';
         const FRONTEND_ORIGIN = window.location.protocol.startsWith('http') ? window.location.origin : '';
         let API_BASE = '';
         let socketIoClientPromise = null;
@@ -128,6 +129,16 @@ let currentUser = null;
                 }
             } catch (_) {}
 
+            const isRemoteFrontend = typeof window !== 'undefined' && window.location.hostname && ![
+                'localhost',
+                '127.0.0.1'
+            ].includes(window.location.hostname);
+
+            if (isRemoteFrontend && PRODUCTION_API_BASE && await probeApiBase(PRODUCTION_API_BASE)) {
+                API_BASE = PRODUCTION_API_BASE;
+                return API_BASE;
+            }
+
             const isLocalFrontendOrigin = typeof window !== 'undefined' && (
                 window.location.hostname === 'localhost' ||
                 window.location.hostname === '127.0.0.1'
@@ -149,6 +160,11 @@ let currentUser = null;
                         return API_BASE;
                     }
                 }
+            }
+
+            if (PRODUCTION_API_BASE) {
+                API_BASE = PRODUCTION_API_BASE;
+                return API_BASE;
             }
 
             API_BASE = 'http://localhost:3000';

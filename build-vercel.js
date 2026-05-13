@@ -5,7 +5,7 @@ const rootDir = __dirname;
 const sourceDir = path.join(rootDir, 'frontend');
 const outputDir = path.join(rootDir, 'public');
 const nestedOutputDir = path.join(outputDir, 'frontend');
-const apiBase = process.env.API_BASE || '';
+const apiBase = process.env.API_BASE || 'https://crime-detection-ii5r.onrender.com';
 
 const filesToCopy = ['index.html', 'style.css', 'app.js', 'env.js'];
 
