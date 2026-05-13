@@ -6,24 +6,46 @@ const User = require('./models/User');
 module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
   // Register
   app.post('/api/register', async (req, res) => {
-    const { username, password, role } = req.body;
-    if (!username || !password) return res.status(400).json({ success: false, message: 'Missing fields' });
+    const username = String(req.body.username || '').trim();
+    const password = String(req.body.password || '');
+    const role = String(req.body.role || 'citizen').trim() || 'citizen';
+
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Username and password are required' });
+    }
+
+    if (!['admin', 'officer', 'citizen'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role selected' });
+    }
+
     const hash = await bcrypt.hash(password, 10);
     try {
       const user = await User.create({ username, password: hash, role });
       res.json({ success: true, user: { username: user.username, role: user.role } });
     } catch (e) {
-      res.status(400).json({ success: false, message: 'User exists' });
+      if (e && e.code === 11000) {
+        return res.status(409).json({ success: false, message: 'User already exists' });
+      }
+
+      res.status(400).json({ success: false, message: e.message || 'Unable to register user' });
     }
   });
 
   // Login
   app.post('/api/auth', async (req, res) => {
-    const { username, password } = req.body;
+    const username = String(req.body.username || '').trim();
+    const password = String(req.body.password || '');
+
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Username and password are required' });
+    }
+
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ success: false, message: 'Invalid credentials' });
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ success: false, message: 'Invalid credentials' });
+
     const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1d' });
     res.json({ success: true, token, role: user.role });
   });
