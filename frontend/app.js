@@ -244,6 +244,28 @@ let currentUser = null;
             return payload;
         }
 
+        // Check backend health
+        async function checkBackendHealth() {
+            try {
+                const apiBase = await resolveApiBase();
+                const response = await fetch(`${apiBase}/api/health`, { 
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Backend health check passed:', data);
+                    return true;
+                } else {
+                    console.warn('Backend health check failed with status:', response.status);
+                    return false;
+                }
+            } catch (error) {
+                console.warn('Backend health check error:', error.message);
+                return false;
+            }
+        }
+
         // Show register overlay first
         document.getElementById('registerOverlay').style.display = 'flex';
         document.getElementById('mainLoginOverlay').style.display = 'none';
@@ -438,7 +460,11 @@ let currentUser = null;
 
                 speechSocket = socketIo(API_BASE, {
                     auth: { token: authToken },
-                    transports: ['websocket']
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    reconnectionAttempts: 5
                 });
 
                 speechSocket.on('new-alert', (alert) => {
@@ -496,7 +522,15 @@ let currentUser = null;
                 });
 
                 speechSocket.on('connect_error', (error) => {
-                    console.warn('Speech socket connection failed:', error.message);
+                    console.warn('Speech socket connection error:', error.message, error);
+                });
+
+                speechSocket.on('disconnect', (reason) => {
+                    console.warn('Speech socket disconnected:', reason);
+                });
+
+                speechSocket.on('error', (error) => {
+                    console.warn('Speech socket error:', error);
                 });
             }).catch((error) => {
                 console.warn('Socket.IO client unavailable:', error.message);

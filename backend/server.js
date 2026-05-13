@@ -18,7 +18,16 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const app = express();
 const server = http.createServer(app);
-const io = socketio(server, { cors: { origin: '*' } });
+const io = socketio(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: false
+  },
+  transports: ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout: 20000
+});
 const PORT = Number(process.env.PORT || 3000);
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const corsOptions = {
@@ -189,6 +198,15 @@ io.on('connection', (socket) => {
 function emitAlert(alert) {
   io.emit('new-alert', alert);
 }
+
+// Health check endpoint (no auth required)
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    mongoConnected: mongoose.connection.readyState === 1
+  });
+});
 
 // --- User Profile Management ---
 app.get('/api/profile', async (req, res) => {
@@ -772,6 +790,15 @@ app.delete('/api/contacts', (req, res) => {
 // Do not serve frontend here when frontend is deployed separately.
 // If you want the backend to also serve the frontend, re-enable the
 // static middleware and the catch-all route above.
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message, err.stack);
+  res.status(500).json({ 
+    success: false, 
+    error: err.message || 'Internal server error'
+  });
+});
 
 // Start server
 function startServer(port) {
