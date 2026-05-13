@@ -609,52 +609,45 @@ app.get('/api/analytics', (req, res) => {
 
 // Reports
 app.get('/api/reports', (req, res) => {
-  try {
-    const { latitude, longitude, userId, username, citizenName, citizenPhone, locationText, reportId } = req.body || {};
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-    const reporterName = username || citizenName || 'Citizen';
+  res.json({ reports });
+});
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
-    }
+app.patch('/api/reports/:id/status', (req, res) => {
+  if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const alert = {
-      id: `SOS-${Date.now()}`,
-      type: 'SOS Emergency',
-      location: locationText || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      latitude: lat,
-      longitude: lng,
-      userId: userId || req.user?.id || 'anonymous',
-      reportedBy: reporterName,
-      citizenName: citizenName || reporterName,
-      citizenPhone: citizenPhone || '',
-      reportId: reportId || null,
-      time: new Date().toLocaleString()
-    };
-
-    alerts.unshift(alert);
-
-    try {
-      if (req.user && mongoose.connection.readyState === 1) {
-        const profile = await Profile.findOne({ user: req.user.id }).lean();
-        if (profile) {
-          alert.avatar = profile.avatar || null;
-          alert.email = profile.email || null;
-        }
-      }
-    } catch (_) {
-      // ignore profile lookup issues
-    }
-
-    recordAudit('sos', alert.location, reporterName);
-    emitAlert(alert);
-    io.emit('citizen-sos', alert);
-    res.json({ success: true, alert });
-  } catch (error) {
-    console.warn('[SOS] POST failed:', error.message);
-    res.status(500).json({ success: false, message: 'Unable to submit SOS alert' });
+  const reportId = String(req.params.id || '').trim();
+  const status = String(req.body.status || '').trim();
+  const notes = String(req.body.notes || '').trim();
+  if (!reportId || !status) {
+    return res.status(400).json({ success: false, message: 'Report id and status are required' });
   }
+
+  const report = reports.find((item) => item.id === reportId);
+  if (!report) {
+    return res.status(404).json({ success: false, message: 'Report not found' });
+  }
+
+  report.status = status;
+  report.notes = notes;
+  report.updatedAt = new Date().toISOString();
+  recordAudit('report-status', `${reportId} -> ${status}`, req.user.username);
+
+  res.json({ success: true, report });
+});
+
+app.post('/api/report', upload.array('evidence'), (req, res) => {
+  const {
+    type,
+    location,
+    description,
+    citizenName,
+    citizenPhone,
+    citizenDetails,
+    reportLatitude,
+    reportLongitude
+  } = req.body;
+  const id = 'INC-' + Math.floor(Math.random() * 10000);
+  const lat = Number(reportLatitude);
   const lng = Number(reportLongitude);
   const reporterName = req.user?.username || citizenName || 'Citizen';
   const report = {
