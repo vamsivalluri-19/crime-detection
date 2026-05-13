@@ -2,8 +2,53 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
+const fs = require('fs');
+const path = require('path');
 
+const fallbackStorePath = path.join(__dirname, 'data', 'auth-users.json');
 const memoryUsers = new Map();
+
+function ensureFallbackStoreDir() {
+  try {
+    fs.mkdirSync(path.dirname(fallbackStorePath), { recursive: true });
+  } catch (_) {}
+}
+
+function loadFallbackUsers() {
+  ensureFallbackStoreDir();
+
+  try {
+    if (!fs.existsSync(fallbackStorePath)) {
+      return;
+    }
+
+    const raw = fs.readFileSync(fallbackStorePath, 'utf8');
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    if (Array.isArray(parsed)) {
+      for (const user of parsed) {
+        if (user && user.username && user.password) {
+          memoryUsers.set(user.username, user);
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore malformed fallback store and start fresh.
+  }
+}
+
+function persistFallbackUsers() {
+  ensureFallbackStoreDir();
+
+  try {
+    const payload = JSON.stringify(Array.from(memoryUsers.values()), null, 2);
+    fs.writeFileSync(fallbackStorePath, payload, 'utf8');
+  } catch (_) {
+    // If disk persistence fails, keep the in-memory fallback alive for this process.
+  }
+}
+
+loadFallbackUsers();
 
 function isMongoConnected() {
   return mongoose.connection && mongoose.connection.readyState === 1;
@@ -43,6 +88,7 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
       };
 
       memoryUsers.set(username, user);
+      persistFallbackUsers();
       return res.json({ success: true, user: makeUserPayload(user) });
     }
 
@@ -67,6 +113,7 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
         };
 
         memoryUsers.set(username, user);
+        persistFallbackUsers();
         return res.json({ success: true, user: makeUserPayload(user) });
       }
 
@@ -78,6 +125,7 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
   app.post('/api/auth', async (req, res) => {
     const username = String(req.body.username || '').trim();
     const password = String(req.body.password || '');
+    const requestedRole = String(req.body.role || '').trim();
 
     if (!username || !password) {
       return res.status(400).json({ success: false, message: 'Username and password are required' });
@@ -105,7 +153,13 @@ module.exports = (app, JWT_SECRET = 'your_jwt_secret') => {
     if (!match) return res.status(400).json({ success: false, message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ success: true, token, role: user.role });
+    res.json({
+      success: true,
+      token,
+      role: user.role,
+      requestedRole: requestedRole || undefined,
+      message: requestedRole && requestedRole !== user.role ? `Logged in as ${user.role}` : undefined
+    });
   });
 
   // Auth middleware

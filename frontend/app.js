@@ -347,16 +347,15 @@ let currentUser = null;
                 const data = await apiRequest('/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username, password, role })
                 }, false);
-
-                if (data.role && role !== data.role) {
-                    throw new Error(`Account role is ${data.role}. Please choose the correct role.`);
-                }
 
                 authToken = data.token || '';
                 localStorage.setItem('crimeAiToken', authToken);
                 document.getElementById('loginErrorMsg').style.display = 'none';
+                if (data.message) {
+                    showNotification('Login', data.message);
+                }
                 showDashboardAfterLogin(username, data.role || role);
                 form.reset();
             } catch (error) {
