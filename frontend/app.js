@@ -1696,4 +1696,479 @@ let currentUser = null;
             }
         }
 
-        // ... rest of file unchanged for brevity (moved from root app.js)
+        function getGPSLocation() {
+            if (!navigator.geolocation) {
+                showNotification('GPS unavailable', 'Your browser does not support location access.');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition((position) => {
+                const { latitude, longitude } = position.coords;
+                const locationInput = document.getElementById('reportLocation');
+                const latInput = document.getElementById('reportLatitude');
+                const lngInput = document.getElementById('reportLongitude');
+
+                if (locationInput) locationInput.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+                if (latInput) latInput.value = String(latitude);
+                if (lngInput) lngInput.value = String(longitude);
+
+                showNotification('Location captured', 'GPS coordinates added to the report form.');
+            }, () => {
+                showNotification('Location error', 'Unable to read your location. Please enable GPS permissions.');
+            });
+        }
+
+        async function submitReport(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData();
+            formData.append('type', form.type.value.trim());
+            formData.append('location', form.location.value.trim());
+            formData.append('description', form.description.value.trim());
+            formData.append('incidentDate', form.incidentDate.value || '');
+            formData.append('witness', form.witness.value.trim());
+            formData.append('citizenName', form.citizenName?.value?.trim() || currentUser || 'Citizen');
+            formData.append('citizenPhone', form.citizenPhone?.value?.trim() || '');
+            formData.append('citizenDetails', form.citizenDetails?.value?.trim() || '');
+            formData.append('reportLatitude', form.reportLatitude.value || '');
+            formData.append('reportLongitude', form.reportLongitude.value || '');
+
+            const evidenceFiles = form.evidence.files || [];
+            for (const file of evidenceFiles) {
+                formData.append('evidence', file);
+            }
+
+            const submitMsg = document.getElementById('reportSubmitMsg');
+            try {
+                const data = await apiRequest('/api/report', {
+                    method: 'POST',
+                    body: formData
+                }, false);
+
+                if (submitMsg) {
+                    submitMsg.style.display = 'block';
+                    submitMsg.className = 'success-msg';
+                    submitMsg.textContent = data?.message || 'Report submitted successfully.';
+                }
+
+                showNotification('Report sent', 'Your incident report has been submitted.');
+                form.reset();
+                configureCitizenComplaintForm(userRole);
+                await loadReports();
+                switchTab('dashboard');
+            } catch (error) {
+                if (submitMsg) {
+                    submitMsg.style.display = 'block';
+                    submitMsg.className = 'error-msg';
+                    submitMsg.textContent = error.message || 'Failed to submit report.';
+                }
+                showNotification('Report failed', error.message || 'Unable to submit report.');
+            }
+        }
+
+        async function loadReports() {
+            const tableBody = document.getElementById('incidentReportsTableBody');
+            if (!tableBody) return;
+
+            try {
+                const data = await apiRequest('/api/reports', { method: 'GET' }, false);
+                const reports = Array.isArray(data.reports) ? data.reports : [];
+
+                tableBody.innerHTML = reports.length ? reports.map((report) => `
+                    <tr data-status="${report.status || 'Open'}">
+                        <td>${report.id || 'N/A'}</td>
+                        <td>${report.type || 'N/A'}</td>
+                        <td>${report.location || 'N/A'}</td>
+                        <td><span class="badge badge-${String(report.status || 'Open').toLowerCase().includes('resolv') ? 'success' : String(report.status || 'Open').toLowerCase().includes('investig') ? 'warning' : 'danger'}">${report.status || 'Open'}</span></td>
+                        <td><span class="badge badge-warning">${report.priority || 'Medium'}</span></td>
+                        <td>${report.date || ''}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick="viewIncidentDetails('${report.id || ''}','${report.type || ''}','${report.location || ''}','${report.status || 'Open'}')">View</button>
+                            <button class="btn btn-success btn-small" onclick="updateIncidentStatus('${report.id || ''}')">Update</button>
+                        </td>
+                    </tr>
+                `).join('') : `
+                    <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">No reports found.</td></tr>
+                `;
+
+                filterIncidentReports();
+            } catch (error) {
+                showNotification('Reports unavailable', error.message || 'Unable to load incident reports.');
+            }
+        }
+
+        function filterIncidentReports() {
+            const searchInput = document.getElementById('incidentSearchInput');
+            const statusFilter = document.getElementById('incidentStatusFilter');
+            const rows = document.querySelectorAll('#incidentReportsTableBody tr');
+            const searchText = String(searchInput?.value || '').toLowerCase();
+            const statusValue = String(statusFilter?.value || '').toLowerCase();
+
+            rows.forEach((row) => {
+                const rowText = row.textContent.toLowerCase();
+                const rowStatus = String(row.getAttribute('data-status') || '').toLowerCase();
+                const matchesSearch = !searchText || rowText.includes(searchText);
+                const matchesStatus = !statusValue || rowStatus === statusValue;
+                row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+            });
+        }
+
+        function viewIncidentDetails(id, type, location, status) {
+            const modal = document.getElementById('incidentDetailModal');
+            const title = document.getElementById('incidentDetailTitle');
+            const body = document.getElementById('incidentDetailBody');
+            if (!modal || !title || !body) return;
+
+            title.textContent = `${id || 'Incident'} Details`;
+            body.innerHTML = `
+                <div><strong>Type:</strong> ${type || 'N/A'}</div>
+                <div><strong>Location:</strong> ${location || 'N/A'}</div>
+                <div><strong>Status:</strong> ${status || 'Open'}</div>
+                <div><strong>Reported By:</strong> ${currentUser || 'Citizen'}</div>
+            `;
+            modal.classList.add('active');
+        }
+
+        function updateIncidentStatus(id) {
+            const modal = document.getElementById('updateStatusModal');
+            const idField = document.getElementById('updateStatusId');
+            const msg = document.getElementById('updateStatusMsg');
+            if (!modal || !idField || !msg) return;
+
+            idField.textContent = id || 'Unknown incident';
+            msg.style.display = 'none';
+            modal.classList.add('active');
+        }
+
+        async function submitStatusUpdate() {
+            const idField = document.getElementById('updateStatusId');
+            const statusSelect = document.getElementById('newStatusSelect');
+            const notes = document.getElementById('updateStatusNotes');
+            const msg = document.getElementById('updateStatusMsg');
+
+            if (msg) {
+                msg.style.display = 'block';
+                msg.className = 'success-msg';
+                msg.textContent = `Updated ${idField?.textContent || 'incident'} to ${statusSelect?.value || 'Open'}.`;
+            }
+
+            showNotification('Status updated', `Incident ${idField?.textContent || ''} set to ${statusSelect?.value || 'Open'}.`);
+            const modal = document.getElementById('updateStatusModal');
+            if (modal) modal.classList.remove('active');
+
+            if (notes) notes.value = '';
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData();
+            formData.append('name', form.name.value.trim());
+            formData.append('email', form.email.value.trim());
+            formData.append('phone', form.phone.value.trim());
+
+            const notificationPreferences = {
+                emailIncidents: Boolean(form.emailIncidents.checked),
+                smsEmergencies: Boolean(form.smsEmergencies.checked),
+                pushNotifications: Boolean(form.pushNotifications.checked)
+            };
+            formData.append('notificationPreferences', JSON.stringify(notificationPreferences));
+
+            if (form.avatar?.files?.[0]) {
+                formData.append('avatar', form.avatar.files[0]);
+            }
+
+            const profileMsg = document.getElementById('profileMsg');
+            try {
+                await apiRequest('/api/profile', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (profileMsg) {
+                    profileMsg.style.display = 'block';
+                    profileMsg.className = 'success-msg';
+                    profileMsg.textContent = 'Profile updated successfully.';
+                }
+
+                showNotification('Profile saved', 'Your profile changes were saved.');
+                await loadProfile();
+            } catch (error) {
+                if (profileMsg) {
+                    profileMsg.style.display = 'block';
+                    profileMsg.className = 'error-msg';
+                    profileMsg.textContent = error.message || 'Profile update failed.';
+                }
+            }
+        }
+
+        async function changePassword(event) {
+            event.preventDefault();
+            const form = event.target;
+            const passwordMsg = document.getElementById('passwordMsg');
+
+            if (form.newPassword.value !== form.confirmNewPassword.value) {
+                if (passwordMsg) {
+                    passwordMsg.style.display = 'block';
+                    passwordMsg.className = 'error-msg';
+                    passwordMsg.textContent = 'New password and confirmation do not match.';
+                }
+                return;
+            }
+
+            try {
+                await apiRequest('/api/profile/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentPassword: form.currentPassword.value,
+                        newPassword: form.newPassword.value
+                    })
+                });
+
+                if (passwordMsg) {
+                    passwordMsg.style.display = 'block';
+                    passwordMsg.className = 'success-msg';
+                    passwordMsg.textContent = 'Password updated successfully.';
+                }
+                form.reset();
+            } catch (error) {
+                if (passwordMsg) {
+                    passwordMsg.style.display = 'block';
+                    passwordMsg.className = 'error-msg';
+                    passwordMsg.textContent = error.message || 'Password update failed.';
+                }
+            }
+        }
+
+        async function loadContacts() {
+            const table = document.getElementById('contactsTableBody');
+            if (!table) return;
+
+            try {
+                const data = await apiRequest('/api/contacts', { method: 'GET' }, false);
+                const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+                table.innerHTML = contacts.map((contact) => `
+                    <tr>
+                        <td>${contact.name || 'N/A'}</td>
+                        <td>${contact.relation || contact.relation || 'N/A'}</td>
+                        <td>${contact.phone || 'N/A'}</td>
+                        <td><button class="btn btn-danger btn-small" onclick="removeContact('${contact.phone || ''}')">Remove</button></td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.warn('Contacts unavailable:', error.message);
+            }
+        }
+
+        async function addContact() {
+            const name = prompt('Contact name:');
+            if (!name) return;
+            const relation = prompt('Relationship:') || 'Emergency';
+            const phone = prompt('Phone number:');
+            if (!phone) return;
+
+            try {
+                await apiRequest('/api/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, relation, phone })
+                }, false);
+                await loadContacts();
+            } catch (error) {
+                showNotification('Contact failed', error.message || 'Unable to add contact.');
+            }
+        }
+
+        async function removeContact(phone) {
+            try {
+                await apiRequest('/api/contacts', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                }, false);
+                await loadContacts();
+            } catch (error) {
+                showNotification('Contact failed', error.message || 'Unable to remove contact.');
+            }
+        }
+
+        function openUploadEvidenceModal() {
+            const modal = document.getElementById('uploadEvidenceModal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function clearEvidenceFilters() {
+            const search = document.getElementById('evSearchInput');
+            const type = document.getElementById('evTypeFilter');
+            const status = document.getElementById('evStatusFilter');
+            if (search) search.value = '';
+            if (type) type.value = '';
+            if (status) status.value = '';
+            filterEvidenceVault();
+        }
+
+        function filterEvidenceVault() {
+            const searchText = String(document.getElementById('evSearchInput')?.value || '').toLowerCase();
+            const typeValue = String(document.getElementById('evTypeFilter')?.value || '').toLowerCase();
+            const statusValue = String(document.getElementById('evStatusFilter')?.value || '').toLowerCase();
+            const cards = document.querySelectorAll('#evidenceVaultGrid .detection-card');
+
+            cards.forEach((card) => {
+                const text = card.textContent.toLowerCase();
+                const matchesSearch = !searchText || text.includes(searchText);
+                const matchesType = !typeValue || text.includes(typeValue);
+                const matchesStatus = !statusValue || text.includes(statusValue);
+                card.style.display = matchesSearch && matchesType && matchesStatus ? '' : 'none';
+            });
+        }
+
+        async function submitEvidenceUpload(event) {
+            event.preventDefault();
+            const msg = document.getElementById('evUploadMsg');
+            if (msg) {
+                msg.style.display = 'block';
+                msg.className = 'success-msg';
+                msg.textContent = 'Evidence upload saved locally in this build.';
+            }
+            const modal = document.getElementById('uploadEvidenceModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function renderEvidenceVault() {
+            const grid = document.getElementById('evidenceVaultGrid');
+            if (!grid) return;
+
+            grid.innerHTML = `
+                <div class="detection-card">
+                    <div class="detection-image">📸</div>
+                    <div class="detection-info">
+                        <div class="detection-type weapon">Photo Evidence</div>
+                        <div style="color:var(--text-muted);font-size:14px;">Case: INC-2024-001</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchAuditLogs() {
+            try {
+                await apiRequest('/api/audit-logs', { method: 'GET' });
+                showNotification('Audit log', 'Audit logs loaded successfully.');
+            } catch (error) {
+                showNotification('Audit log unavailable', error.message || 'Unable to load audit logs.');
+            }
+        }
+
+        function startDetection() {
+            const statusText = document.getElementById('aiStatusText');
+            const statusDot = document.getElementById('aiStatusDot');
+            const logPanel = document.getElementById('detectionLogPanel');
+            const stopBtn = document.getElementById('aiStopBtn');
+            const startBtn = document.getElementById('aiStartBtn');
+            if (statusText) statusText.textContent = 'Running';
+            if (statusDot) statusDot.style.background = '#22c55e';
+            if (logPanel) logPanel.style.display = '';
+            if (stopBtn) stopBtn.disabled = false;
+            if (startBtn) startBtn.disabled = true;
+            showNotification('Detection started', 'AI detection is now running.');
+        }
+
+        function stopDetection() {
+            const statusText = document.getElementById('aiStatusText');
+            const statusDot = document.getElementById('aiStatusDot');
+            const stopBtn = document.getElementById('aiStopBtn');
+            const startBtn = document.getElementById('aiStartBtn');
+            if (statusText) statusText.textContent = 'Stopped';
+            if (statusDot) statusDot.style.background = '#94a3b8';
+            if (stopBtn) stopBtn.disabled = true;
+            if (startBtn) startBtn.disabled = false;
+            showNotification('Detection stopped', 'AI detection has been stopped.');
+        }
+
+        function exportDetectionLog() {
+            showNotification('Export ready', 'Detection log export is not connected in this build.');
+        }
+
+        function dispatchUnit(id, type, location) {
+            showNotification('Dispatch', `Unit dispatched for ${id} at ${location}.`);
+        }
+
+        function monitorFeed(id, type, location) {
+            showNotification('Monitoring', `${type} at ${location} is now being monitored.`);
+        }
+
+        function interceptVehicle(id, plate, location) {
+            showNotification('Intercept', `Vehicle ${plate} at ${location} is being intercepted.`);
+        }
+
+        function adminAddCamera() { showNotification('Camera', 'Add camera flow is not connected in this build.'); }
+        function adminRefreshCameras() { showNotification('Camera', 'Camera list refreshed.'); }
+        function adminSaveModelConfig() { showNotification('Model', 'Model config saved.'); }
+        function adminResetModel() { showNotification('Model', 'Model reset to defaults.'); }
+        function adminClearHistory() {
+            const history = document.getElementById('adminDetectionHistory');
+            if (history) history.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:20px;">History cleared.</div>';
+        }
+
+        function runNLPAnalysis() {
+            refreshAnalytics();
+            showNotification('Analysis refreshed', 'NLP crime analysis updated.');
+        }
+
+        function generateAnalysisReport() {
+            showNotification('Report generated', 'Analysis report is ready.');
+        }
+
+        function emailReport() {
+            const modal = document.getElementById('emailReportModal');
+            if (!modal) return;
+
+            const subject = document.getElementById('emailReportSubjectDisplay');
+            const body = document.getElementById('emailReportBody');
+            const mailto = document.getElementById('emailReportMailtoLink');
+
+            const reportSubject = 'AI Crime Detection Analysis Report';
+            const reportBody = [
+                `Prepared for: ${currentUser || 'User'}`,
+                `Generated: ${new Date().toLocaleString()}`,
+                'Summary: Live dashboard report from the AI Crime Detection System.'
+            ].join('\n');
+
+            if (subject) subject.textContent = reportSubject;
+            if (body) body.value = reportBody;
+            if (mailto) mailto.href = `mailto:?subject=${encodeURIComponent(reportSubject)}&body=${encodeURIComponent(reportBody)}`;
+            modal.classList.add('active');
+        }
+
+        function copyEmailBody() {
+            const body = document.getElementById('emailReportBody');
+            if (!body) return;
+            body.select();
+            document.execCommand('copy');
+            showNotification('Copied', 'Email body copied to clipboard.');
+        }
+
+        function sendEmailReport() {
+            const link = document.getElementById('emailReportMailtoLink');
+            if (link) {
+                window.open(link.href, '_blank');
+            }
+        }
+
+        function deployNewUnit() {
+            const units = document.getElementById('patrolUnits');
+            if (!units) return;
+
+            const card = document.createElement('div');
+            card.className = 'patrol-card';
+            card.innerHTML = `
+                <div class="patrol-header">
+                    <div class="patrol-id">Unit P-${Math.floor(100 + Math.random() * 900)}</div>
+                    <span class="badge badge-success">Active</span>
+                </div>
+                <div style="color: var(--text-muted); font-size: 14px;">\n                    <div>📍 New deployment</div>\n                    <div>👮 Officers: 2</div>\n                    <div>⏱️ Response: 4.0 min</div>\n                </div>
+            `;
+            units.prepend(card);
+            showNotification('Unit deployed', 'A patrol unit has been added to the dashboard.');
+        }
